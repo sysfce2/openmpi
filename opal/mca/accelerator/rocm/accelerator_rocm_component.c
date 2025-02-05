@@ -7,6 +7,9 @@
  * Copyright (c) 2017-2022 Amazon.com, Inc. or its affiliates.
  *                         All Rights reserved.
  * Copyright (c) 2022-2024 Advanced Micro Devices, Inc. All Rights reserved.
+ * Copyright (c) 2024      The University of Tennessee and The University
+ *                         of Tennessee Research Foundation.  All rights
+ *                         reserved.
  * $COPYRIGHT$
  *
  * Additional copyrights may follow
@@ -19,7 +22,9 @@
 #include <stdio.h>
 
 #include "opal/mca/dl/base/base.h"
+#include "opal/mca/accelerator/base/base.h"
 #include "opal/runtime/opal_params.h"
+#include "opal/util/proc.h"
 #include "accelerator_rocm.h"
 
 int opal_accelerator_rocm_memcpy_async = 0;
@@ -31,7 +36,10 @@ size_t opal_accelerator_rocm_memcpyH2D_limit=1048576;
 static opal_mutex_t accelerator_rocm_init_lock;
 static bool accelerator_rocm_init_complete = false;
 
-hipStream_t opal_accelerator_rocm_MemcpyStream = NULL;
+/* Define global variables, used in accelerator_rocm.c */
+int opal_accelerator_rocm_num_devices = 0;
+float *opal_accelerator_rocm_mem_bw = NULL;
+hipStream_t *opal_accelerator_rocm_MemcpyStream = NULL;
 
 /*
  * Public string showing the accelerator rocm component version number
@@ -122,43 +130,58 @@ static int accelerator_rocm_close(void)
 
 static int accelerator_rocm_component_register(void)
 {
+    int var_id;
+
     /* Set verbosity in the rocm related code. */
     opal_accelerator_rocm_verbose = 0;
-    (void) mca_base_var_register("ompi", "mpi", "accelerator_rocm", "verbose",
-                                 "Set level of rocm verbosity", MCA_BASE_VAR_TYPE_INT, NULL,
-                                 0, 0, OPAL_INFO_LVL_9, MCA_BASE_VAR_SCOPE_READONLY,
-                                 &opal_accelerator_rocm_verbose);
+    var_id = mca_base_component_var_register (&mca_accelerator_rocm_component.super.base_version,
+                                              "verbose", "Set level of verbosity of rocm component",
+                                              MCA_BASE_VAR_TYPE_INT, NULL, 0,
+                                              0, OPAL_INFO_LVL_9, MCA_BASE_VAR_SCOPE_READONLY,
+                                              &opal_accelerator_rocm_verbose);
+    (void) mca_base_var_register_synonym (var_id, "ompi", "mpi", "accelerator_rocm", "verbose",
+                                          MCA_BASE_VAR_SYN_FLAG_DEPRECATED);
 
     /* Switching point between using memcpy and hipMemcpy* functions. */
     opal_accelerator_rocm_memcpyD2H_limit = 1024;
-    (void) mca_base_var_register("ompi", "mpi", "accelerator_rocm", "memcpyD2H_limit",
-                                 "Max. msg. length to use memcpy instead of hip functions "
-                                 "for device-to-host copy operations",
-                                 MCA_BASE_VAR_TYPE_INT, NULL, 0, 0,
-                                 OPAL_INFO_LVL_9, MCA_BASE_VAR_SCOPE_READONLY,
-                                 &opal_accelerator_rocm_memcpyD2H_limit);
-
+    var_id = mca_base_component_var_register (&mca_accelerator_rocm_component.super.base_version,
+                                              "memcpyD2H_limit",
+                                              "Max. msg. length to use memcpy instead of hip functions "
+                                              "for device-to-host copy operations",
+                                              MCA_BASE_VAR_TYPE_INT, NULL, 0, 0,
+                                              OPAL_INFO_LVL_9, MCA_BASE_VAR_SCOPE_READONLY,
+                                              &opal_accelerator_rocm_memcpyD2H_limit);
+    (void) mca_base_var_register_synonym (var_id, "ompi", "mpi", "accelerator_rocm", "memcpyD2H_limit",
+                                          MCA_BASE_VAR_SYN_FLAG_DEPRECATED);
+    
     /* Switching point between using memcpy and hipMemcpy* functions. */
     opal_accelerator_rocm_memcpyH2D_limit = 1048576;
-    (void) mca_base_var_register("ompi", "mpi", "accelerator_rocm", "memcpyH2D_limit",
-                                 "Max. msg. length to use memcpy instead of hip functions "
-                                 "for host-to-device copy operations",
-                                 MCA_BASE_VAR_TYPE_INT, NULL, 0, 0,
-                                 OPAL_INFO_LVL_9, MCA_BASE_VAR_SCOPE_READONLY,
-                                 &opal_accelerator_rocm_memcpyH2D_limit);
+    var_id = mca_base_component_var_register (&mca_accelerator_rocm_component.super.base_version,
+                                              "memcpyH2D_limit",
+                                              "Max. msg. length to use memcpy instead of hip functions "
+                                              "for host-to-device copy operations",
+                                              MCA_BASE_VAR_TYPE_INT, NULL, 0, 0,
+                                              OPAL_INFO_LVL_9, MCA_BASE_VAR_SCOPE_READONLY,
+                                              &opal_accelerator_rocm_memcpyH2D_limit);
+    (void) mca_base_var_register_synonym (var_id, "ompi", "mpi", "accelerator_rocm", "memcpyH2D_limit",
+                                          MCA_BASE_VAR_SYN_FLAG_DEPRECATED);
 
     /* Use this flag to test async vs sync copies */
     opal_accelerator_rocm_memcpy_async = 0;
-    (void) mca_base_var_register("ompi", "mpi", "accelerator_rocm", "memcpy_async",
-                                 "Set to 1 to force using hipMemcpyAsync instead of hipMemcpy",
-                                 MCA_BASE_VAR_TYPE_INT, NULL, 0, 0, OPAL_INFO_LVL_9,
-                                 MCA_BASE_VAR_SCOPE_READONLY, &opal_accelerator_rocm_memcpy_async);
-
+    var_id = mca_base_component_var_register (&mca_accelerator_rocm_component.super.base_version,
+                                              "memcpy_async",
+                                              "Set to 1 to force using hipMemcpyAsync instead of hipMemcpy",
+                                              MCA_BASE_VAR_TYPE_INT, NULL, 0, 0, OPAL_INFO_LVL_9,
+                                              MCA_BASE_VAR_SCOPE_READONLY,
+                                              &opal_accelerator_rocm_memcpy_async);
+    (void) mca_base_var_register_synonym (var_id, "ompi", "mpi", "accelerator_rocm", "memcpy_async",
+                                          MCA_BASE_VAR_SYN_FLAG_DEPRECATED);
     return OPAL_SUCCESS;
 }
 
 int opal_accelerator_rocm_lazy_init()
 {
+    hipError_t hip_err;
     int err = OPAL_SUCCESS;
 
     /* Double checked locking to avoid having to
@@ -174,12 +197,93 @@ int opal_accelerator_rocm_lazy_init()
         goto out;
     }
 
-    err = hipStreamCreate(&opal_accelerator_rocm_MemcpyStream);
-    if (hipSuccess != err) {
-        opal_output(0, "Could not create hipStream, err=%d %s\n",
-                err, hipGetErrorString(err));
+    hip_err = hipGetDeviceCount(&opal_accelerator_rocm_num_devices);
+    if (hipSuccess != hip_err) {
+        opal_output(0, "Failed to query device count, err=%d %s\n",
+                hip_err, hipGetErrorString(hip_err));
+        err = OPAL_ERROR;
         goto out;
     }
+
+    hipStream_t memcpy_stream;
+    hip_err = hipStreamCreate(&memcpy_stream);
+    if (hipSuccess != hip_err) {
+        opal_output(0, "Could not create hipStream, err=%d %s\n",
+                hip_err, hipGetErrorString(hip_err));
+        err = OPAL_ERROR;  // we got hipErrorInvalidValue, pretty bad
+        goto out;
+    }
+
+    opal_accelerator_rocm_MemcpyStream = malloc(sizeof(hipStream_t));
+    if (NULL == opal_accelerator_rocm_MemcpyStream) {
+        opal_output(0, "Could not allocate hipStream\n");
+        err = OPAL_ERR_OUT_OF_RESOURCE;
+        goto out;
+    }
+    *opal_accelerator_rocm_MemcpyStream = memcpy_stream;
+
+    opal_accelerator_rocm_mem_bw = malloc(sizeof(float)*opal_accelerator_rocm_num_devices);
+    if (NULL == opal_accelerator_rocm_mem_bw) {
+        opal_output(0, "Could not allocate memory_bw array\n");
+        err = OPAL_ERR_OUT_OF_RESOURCE;
+        goto out;
+    }
+
+    for (int i = 0; i < opal_accelerator_rocm_num_devices; ++i) {
+        int mem_clock_rate; // kHz
+        hip_err = hipDeviceGetAttribute(&mem_clock_rate,
+                                        hipDeviceAttributeMemoryClockRate,
+                                        i);
+        if (hipSuccess != hip_err) {
+            opal_output(0, "Failed to query device MemoryClockRate, err=%d %s\n",
+                        hip_err, hipGetErrorString(hip_err));
+            err = OPAL_ERROR;
+            goto out;
+        }
+
+        int bus_width; // bit
+        hip_err = hipDeviceGetAttribute(&bus_width,
+                                        hipDeviceAttributeMemoryBusWidth,
+                                        i);
+        if (hipSuccess != hip_err) {
+            opal_output(0, "Failed to query device MemoryBusWidth, err=%d %s\n",
+                        hip_err, hipGetErrorString(hip_err));
+            err = OPAL_ERROR;
+            goto out;
+        }
+
+        /* bw = clock_rate * bus width * 2bit multiplier */
+        float bw = ((float)mem_clock_rate*(float)bus_width*2.0) / 1024 / 1024 / 8;
+        opal_accelerator_rocm_mem_bw[i] = bw;
+    }
+
+#if HIP_VERSION >= 60000000
+    int dev_id;
+    hip_err = hipGetDevice(&dev_id);
+    if (hipSuccess != hip_err) {
+        opal_output(0, "error retrieving current device");
+        err = OPAL_ERROR;
+        goto out;
+    }
+
+    int has_large_bar = 0;
+    hip_err = hipDeviceGetAttribute (&has_large_bar, hipDeviceAttributeIsLargeBar,
+                                     dev_id);
+    if (hipSuccess != hip_err) {
+        opal_output(0, "error retrieving current device");
+        err = OPAL_ERROR;
+        goto out;
+    }
+
+    if (0 == has_large_bar) {
+        // Without large BAR we have to use hipMemcpy(Async) for all data transfers
+        opal_output(0, "Large BAR support is not enabled on current device. "
+                    "Enable large BAR support in BIOS (Above 4G Encoding) for "
+                    "better performance\n.");
+        opal_accelerator_rocm_memcpyH2D_limit = 0;
+        opal_accelerator_rocm_memcpyD2H_limit = 0;
+    }
+#endif
 
     err = OPAL_SUCCESS;
     opal_atomic_wmb();
@@ -192,7 +296,7 @@ out:
 static opal_accelerator_base_module_t* accelerator_rocm_init(void)
 {
     OBJ_CONSTRUCT(&accelerator_rocm_init_lock, opal_mutex_t);
-    
+
     hipError_t err;
 
     if (opal_rocm_runtime_initialized) {
@@ -214,12 +318,16 @@ static opal_accelerator_base_module_t* accelerator_rocm_init(void)
 
 static void accelerator_rocm_finalize(opal_accelerator_base_module_t* module)
 {
-    if (NULL != (void*)opal_accelerator_rocm_MemcpyStream) {
-        hipError_t err = hipStreamDestroy(opal_accelerator_rocm_MemcpyStream);
+    if (NULL != opal_accelerator_rocm_MemcpyStream) {
+        hipError_t err = hipStreamDestroy(*opal_accelerator_rocm_MemcpyStream);
         if (hipSuccess != err) {
             opal_output_verbose(10, 0, "hip_dl_finalize: error while destroying the hipStream\n");
         }
+        free(opal_accelerator_rocm_MemcpyStream);
         opal_accelerator_rocm_MemcpyStream = NULL;
+
+        free(opal_accelerator_rocm_mem_bw);
+        opal_accelerator_rocm_mem_bw = NULL;
     }
 
     OBJ_DESTRUCT(&accelerator_rocm_init_lock);

@@ -9,6 +9,7 @@
  *                         University of Stuttgart.  All rights reserved.
  * Copyright (c) 2004-2005 The Regents of the University of California.
  *                         All rights reserved.
+ * Copyright (c) 2024      NVIDIA Corporation.  All rights reserved.
  * $COPYRIGHT$
  *
  * Additional copyrights may follow
@@ -33,16 +34,16 @@
  *	Accepts:	- same arguments as MPI_Bcast()
  *	Returns:	- MPI_SUCCESS or error code
  */
-int mca_coll_demo_bcast_intra(void *buff, int count,
+int mca_coll_demo_bcast_intra(void *buff, size_t count,
                               struct ompi_datatype_t *datatype, int root,
                               struct ompi_communicator_t *comm,
                               mca_coll_base_module_t *module)
 {
     mca_coll_demo_module_t *demo_module = (mca_coll_demo_module_t*) module;
     opal_output_verbose(10, ompi_coll_base_framework.framework_output, "In demo bcast_intra");
-    return demo_module->underlying.coll_bcast(buff, count, datatype,
-                                              root, comm,
-                                              demo_module->underlying.coll_bcast_module);
+    return demo_module->c_coll.coll_bcast(buff, count, datatype,
+                                          root, comm,
+                                          demo_module->c_coll.coll_bcast_module);
 }
 
 
@@ -53,14 +54,14 @@ int mca_coll_demo_bcast_intra(void *buff, int count,
  *	Accepts:	- same arguments as MPI_Bcast()
  *	Returns:	- MPI_SUCCESS or error code
  */
-int mca_coll_demo_bcast_inter(void *buff, int count,
+int mca_coll_demo_bcast_inter(void *buff, size_t count,
                               struct ompi_datatype_t *datatype, int root,
                               struct ompi_communicator_t *comm,
                               mca_coll_base_module_t *module)
 {
     mca_coll_demo_module_t *demo_module = (mca_coll_demo_module_t*) module;
     opal_output_verbose(10, ompi_coll_base_framework.framework_output, "In demo bcast_inter");
-    return demo_module->underlying.coll_bcast(buff, count, datatype,
-                                              root, comm,
-                                              demo_module->underlying.coll_bcast_module);
+    return demo_module->c_coll.coll_bcast(buff, count, datatype,
+                                          root, comm,
+                                          demo_module->c_coll.coll_bcast_module);
 }

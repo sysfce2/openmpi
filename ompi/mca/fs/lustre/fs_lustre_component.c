@@ -13,6 +13,7 @@
  * Copyright (c) 2008-2011 University of Houston. All rights reserved.
  * Copyright (c) 2015      Los Alamos National Security, LLC. All rights
  *                         reserved.
+ * Copyright (c) 2024      Advanced Micro Devices, Inc. All rights reserverd.
  * $COPYRIGHT$
  *
  * Additional copyrights may follow
@@ -45,6 +46,16 @@ int mca_fs_lustre_priority = 20;
    runtime also*/
 int mca_fs_lustre_stripe_size = 0;
 int mca_fs_lustre_stripe_width = 0;
+int mca_fs_lustre_lock_algorithm = 0; /* auto */
+
+static const mca_base_var_enum_value_t ompi_fs_lustre_lock_algorithm_modes[] = {
+    {.value = 0, .string = "auto"},
+    {.value = 1, .string = "skip locking"},
+    {.value = 2, .string = "always lock entire file"},
+    {.value = 3, .string = "lock specific ranges"},
+    {.string = NULL},
+};
+
 /*
  * Instantiate the public struct with all of our public information
  * and pointers to our public functions in it
@@ -75,6 +86,8 @@ mca_fs_base_component_2_0_0_t mca_fs_lustre_component = {
 static int
 lustre_register(void)
 {
+    mca_base_var_enum_t *new_enum;
+
     mca_fs_lustre_priority = 20;
     (void) mca_base_component_var_register(&mca_fs_lustre_component.fsm_version,
                                            "priority", "Priority of the lustre fs component",
@@ -93,6 +106,18 @@ lustre_register(void)
                                            MCA_BASE_VAR_TYPE_INT, NULL, 0, 0,
                                            OPAL_INFO_LVL_9,
                                            MCA_BASE_VAR_SCOPE_READONLY, &mca_fs_lustre_stripe_width);
+
+    (void) mca_base_var_enum_create("mca_fs_lustre_lock_algorithm", ompi_fs_lustre_lock_algorithm_modes, &new_enum);
+
+    mca_fs_lustre_lock_algorithm = 0;
+    (void) mca_base_component_var_register(&mca_fs_lustre_component.fsm_version,
+                                           "lock_algorithm", "Locking algorithm used by the fs lustre component. "
+                                           "(default: auto)",
+                                           MCA_BASE_VAR_TYPE_INT, new_enum, 0, 0,
+                                           OPAL_INFO_LVL_9,
+                                           MCA_BASE_VAR_SCOPE_READONLY,
+                                           &mca_fs_lustre_lock_algorithm);
+    OBJ_RELEASE(new_enum);
 
     return OMPI_SUCCESS;
 }

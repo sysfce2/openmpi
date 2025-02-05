@@ -12,7 +12,9 @@
  * Copyright (c) 2008-2019 University of Houston. All rights reserved.
  * Copyright (c) 2015-2018 Research Organization for Information Science
  *                         and Technology (RIST). All rights reserved.
- * Copyright (c) 2022-2023 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (c) 2024      Triad National Security, LLC. All rights
+ *                         reserved.
  * $COPYRIGHT$
  *
  * Additional copyrights may follow
@@ -37,16 +39,16 @@
 #include <math.h>
 
 static int mca_common_ompio_file_write_pipelined (ompio_file_t *fh, const void *buf,
-                                                  int count, struct ompi_datatype_t *datatype,
+                                                  size_t count, struct ompi_datatype_t *datatype,
                                                   ompi_status_public_t *status);
 
 static int mca_common_ompio_file_write_default (ompio_file_t *fh, const void *buf,
-                                                int count, struct ompi_datatype_t *datatype,
+                                                size_t count, struct ompi_datatype_t *datatype,
                                                 ompi_status_public_t *status);
 
 int mca_common_ompio_file_write (ompio_file_t *fh,
                                const void *buf,
-                               int count,
+                               size_t count,
                                struct ompi_datatype_t *datatype,
                                ompi_status_public_t *status)
 {
@@ -93,7 +95,7 @@ int mca_common_ompio_file_write (ompio_file_t *fh,
 
 int mca_common_ompio_file_write_default (ompio_file_t *fh,
                                          const void *buf,
-                                         int count,
+                                         size_t count,
                                          struct ompi_datatype_t *datatype,
                                          ompi_status_public_t *status)
 {
@@ -152,7 +154,7 @@ int mca_common_ompio_file_write_default (ompio_file_t *fh,
 
 int mca_common_ompio_file_write_pipelined (ompio_file_t *fh,
                                            const void *buf,
-                                           int count,
+                                           size_t count,
                                            struct ompi_datatype_t *datatype,
                                            ompi_status_public_t *status)
 {
@@ -289,7 +291,7 @@ int mca_common_ompio_file_write_pipelined (ompio_file_t *fh,
 int mca_common_ompio_file_write_at (ompio_file_t *fh,
 				  OMPI_MPI_OFFSET_TYPE offset,
 				  const void *buf,
-				  int count,
+				  size_t count,
 				  struct ompi_datatype_t *datatype,
 				  ompi_status_public_t *status)
 {
@@ -327,6 +329,7 @@ static void mca_common_ompio_post_next_write_subreq(struct mca_ompio_request_t *
     decoded_iov.iov_base = req->req_tbuf;
     decoded_iov.iov_len  = req->req_size;
     opal_convertor_pack (&req->req_convertor, &decoded_iov, &iov_count, &pos);
+
     mca_common_ompio_build_io_array (req->req_fview, index, req->req_num_subreqs,
                                      bytes_per_cycle, pos,
                                      iov_count, &decoded_iov,
@@ -345,7 +348,7 @@ static void mca_common_ompio_post_next_write_subreq(struct mca_ompio_request_t *
 
 int mca_common_ompio_file_iwrite (ompio_file_t *fh,
                                 const void *buf,
-                                int count,
+                                size_t count,
                                 struct ompi_datatype_t *datatype,
                                 ompi_request_t **request)
 {
@@ -470,10 +473,76 @@ int mca_common_ompio_file_iwrite (ompio_file_t *fh,
     return ret;
 }
 
+/*
+** This routine is invoked from the fcoll component.
+** It is only used if the temporary buffer is a gpu buffer,
+** and the fbtl supports the ipwritev operation.
+**
+** The io-array has already been generated in fcoll/xxx/file_write_all,
+** and we use the pre-computed offsets to created a pseudo fview.
+** The position of the file pointer is updated in the fcoll
+** component, not here.
+*/
+
+int mca_common_ompio_file_iwrite_pregen (ompio_file_t *fh,
+					 ompi_request_t *request)
+{
+    uint32_t i;
+    size_t max_data;
+    size_t pipeline_buf_size;
+    mca_ompio_request_t *ompio_req = (mca_ompio_request_t *) request;
+
+    if (NULL == fh->f_fbtl->fbtl_ipwritev) {
+	return MPI_ERR_INTERN;
+    }
+
+    max_data = fh->f_io_array[0].length;
+    pipeline_buf_size = OMPIO_MCA_GET(fh, pipeline_buffer_size);
+
+    mca_common_ompio_register_progress ();
+
+    OMPIO_PREPARE_BUF (fh, fh->f_io_array[0].memory_address, max_data, MPI_BYTE,
+		       ompio_req->req_tbuf, &ompio_req->req_convertor, max_data,
+		       pipeline_buf_size, NULL, i);
+
+    ompio_req->req_num_subreqs = ceil((double)max_data/pipeline_buf_size);
+    ompio_req->req_size        = pipeline_buf_size;
+    ompio_req->req_max_data    = max_data;
+    ompio_req->req_post_next_subreq = mca_common_ompio_post_next_write_subreq;
+    ompio_req->req_fh          = fh;
+    ompio_req->req_ompi.req_status.MPI_ERROR = MPI_SUCCESS;
+
+    ompio_req->req_fview = (struct ompio_fview_t *) calloc(1, sizeof(struct ompio_fview_t));
+    if (NULL == ompio_req->req_fview) {
+	opal_output(1, "common_ompio: error allocating memory\n");
+	return OMPI_ERR_OUT_OF_RESOURCE;
+    }
+
+   ompio_req->req_fview->f_decoded_iov = (struct iovec*) malloc ( fh->f_num_of_io_entries *
+								  sizeof(struct iovec));
+    if (NULL == ompio_req->req_fview->f_decoded_iov) {
+        opal_output(1, "common_ompio_file_iwrite_pregen: could not allocate memory\n");
+        return OMPI_ERR_OUT_OF_RESOURCE;
+    }
+
+    ompio_req->req_fview->f_iov_count = fh->f_num_of_io_entries;
+    for (i=0; i < ompio_req->req_fview->f_iov_count; i++) {
+        ompio_req->req_fview->f_decoded_iov[i].iov_base = fh->f_io_array[i].offset;
+        ompio_req->req_fview->f_decoded_iov[i].iov_len  = fh->f_io_array[i].length ;
+    }
+
+    fh->f_num_of_io_entries = 0;
+    free (fh->f_io_array);
+    fh->f_io_array = NULL;
+
+    mca_common_ompio_post_next_write_subreq(ompio_req, 0);
+    return OMPI_SUCCESS;
+}
+
 int mca_common_ompio_file_iwrite_at (ompio_file_t *fh,
 				   OMPI_MPI_OFFSET_TYPE offset,
 				   const void *buf,
-				   int count,
+				   size_t count,
 				   struct ompi_datatype_t *datatype,
 				   ompi_request_t **request)
 {
@@ -505,7 +574,7 @@ int mca_common_ompio_file_iwrite_at (ompio_file_t *fh,
 /******************************************************************/
 int mca_common_ompio_file_write_all (ompio_file_t *fh,
                                      const void *buf,
-                                     int count,
+                                     size_t count,
                                      struct ompi_datatype_t *datatype,
                                      ompi_status_public_t *status)
 {
@@ -560,7 +629,7 @@ int mca_common_ompio_file_write_all (ompio_file_t *fh,
 int mca_common_ompio_file_write_at_all (ompio_file_t *fh,
 				      OMPI_MPI_OFFSET_TYPE offset,
 				      const void *buf,
-				      int count,
+				      size_t count,
 				      struct ompi_datatype_t *datatype,
 				      ompi_status_public_t *status)
 {
@@ -581,7 +650,7 @@ int mca_common_ompio_file_write_at_all (ompio_file_t *fh,
 
 int mca_common_ompio_file_iwrite_all (ompio_file_t *fp,
                                       const void *buf,
-                                      int count,
+                                      size_t count,
                                       struct ompi_datatype_t *datatype,
                                       ompi_request_t **request)
 {
@@ -608,7 +677,7 @@ int mca_common_ompio_file_iwrite_all (ompio_file_t *fp,
 int mca_common_ompio_file_iwrite_at_all (ompio_file_t *fp,
 				       OMPI_MPI_OFFSET_TYPE offset,
 				       const void *buf,
-				       int count,
+				       size_t count,
 				       struct ompi_datatype_t *datatype,
 				       ompi_request_t **request)
 {

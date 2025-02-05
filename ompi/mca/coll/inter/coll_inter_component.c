@@ -14,6 +14,7 @@
  * Copyright (c) 2008      Cisco Systems, Inc.  All rights reserved.
  * Copyright (c) 2015      Los Alamos National Security, LLC. All rights
  *                         reserved.
+ * Copyright (c) 2024      NVIDIA Corporation.  All rights reserved.
  * $COPYRIGHT$
  *
  * Additional copyrights may follow
@@ -56,13 +57,13 @@ static int inter_register(void);
  * and pointers to our public functions in it
  */
 
-const mca_coll_base_component_2_4_0_t mca_coll_inter_component = {
+const mca_coll_base_component_3_0_0_t mca_coll_inter_component = {
 
     /* First, the mca_component_t struct containing meta information
        about the component itself */
 
     .collm_version = {
-        MCA_COLL_BASE_VERSION_2_4_0,
+        MCA_COLL_BASE_VERSION_3_0_0,
 
         /* Component name and version */
         .mca_component_name = "inter",
@@ -113,14 +114,7 @@ mca_coll_inter_module_construct(mca_coll_inter_module_t *module)
     module->inter_comm = NULL;
 }
 
-static void
-mca_coll_inter_module_destruct(mca_coll_inter_module_t *module)
-{
-
-}
-
-
 OBJ_CLASS_INSTANCE(mca_coll_inter_module_t,
                    mca_coll_base_module_t,
                    mca_coll_inter_module_construct,
-                   mca_coll_inter_module_destruct);
+                   NULL);

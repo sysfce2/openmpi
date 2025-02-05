@@ -16,7 +16,7 @@
  *                         and Technology (RIST). All rights reserved.
  * Copyright (c) 2016      University of Houston. All rights reserved.
  * Copyright (c) 2016-2017 IBM Corporation. All rights reserved.
- * Copyright (c) 2018      Triad National Security, LLC. All rights
+ * Copyright (c) 2024      Triad National Security, LLC. All rights
  *                         reserved.
  * $COPYRIGHT$
  *
@@ -131,18 +131,12 @@ int ompi_file_open(struct ompi_communicator_t *comm, const char *filename,
         return OMPI_ERR_OUT_OF_RESOURCE;
     }
 
-    /* Create the mutex */
-    OBJ_CONSTRUCT(&file->f_lock, opal_mutex_t);
-
     /* Select a module and actually open the file */
 
     if (OMPI_SUCCESS != (ret = mca_io_base_file_select(file, NULL))) {
         OBJ_RELEASE(file);
         return ret;
     }
-
-    /* MPI-4 §14.2.8 requires us to remove all unknown keys from the info object */
-    opal_info_remove_unreferenced(file->super.s_info);
 
     /* All done */
 
@@ -156,9 +150,6 @@ int ompi_file_open(struct ompi_communicator_t *comm, const char *filename,
  */
 int ompi_file_close(ompi_file_t **file)
 {
-
-    OBJ_DESTRUCT(&(*file)->f_lock);
-
     (*file)->f_flags |= OMPI_FILE_ISCLOSED;
     OBJ_RELEASE(*file);
     *file = &ompi_mpi_file_null.file;
@@ -241,6 +232,7 @@ static void file_constructor(ompi_file_t *file)
     file->f_comm = NULL;
     file->f_filename = NULL;
     file->f_amode = 0;
+    OBJ_CONSTRUCT(&file->f_lock, opal_mutex_t);
 
     /* Initialize flags */
 
@@ -289,8 +281,8 @@ static void file_destructor(ompi_file_t *file)
     /* Finalize the module */
 
     switch (file->f_io_version) {
-    case MCA_IO_BASE_V_2_0_0:
-        file->f_io_selected_module.v2_0_0.io_module_file_close(file);
+    case MCA_IO_BASE_V_3_0_0:
+        file->f_io_selected_module.v3_0_0.io_module_file_close(file);
         break;
     default:
         /* Should never get here */
@@ -335,4 +327,6 @@ static void file_destructor(ompi_file_t *file)
         opal_pointer_array_set_item(&ompi_file_f_to_c_table,
                                     file->f_f_to_c_index, NULL);
     }
+
+    OBJ_DESTRUCT(&(file->f_lock));
 }

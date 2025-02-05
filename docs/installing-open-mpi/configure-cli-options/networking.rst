@@ -41,8 +41,7 @@ can be used with ``configure``:
   compiler/linker search paths.
 
   Libfabric is the support library for OpenFabrics Interfaces-based
-  network adapters, such as Cisco usNIC, Intel True Scale PSM, Cray
-  uGNI, etc.
+  network adapters, such as Cisco usNIC, Intel True Scale PSM, etc.
 
 * ``--with-libfabric-libdir=DIR``:
   Look in directory for the libfabric libraries.  By default, Open MPI
@@ -74,7 +73,7 @@ can be used with ``configure``:
   only necessary if the PSM headers and libraries are not in default
   compiler/linker search paths.
 
-  PSM is the support library for QLogic InfiniPath and Intel TrueScale
+  PSM is the support library for QLogic InfiniPath and Intel True Scale
   network adapters.
 
 * ``--with-psm-libdir=DIR``:

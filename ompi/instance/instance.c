@@ -7,6 +7,7 @@
  *                         of Tennessee Research Foundation.  All rights
  *                         reserved.
  * Copyright (c) 2023      Jeffrey M. Squyres.  All rights reserved.
+ * Copyright (c) 2024      NVIDIA Corporation.  All rights reserved.
  * $COPYRIGHT$
  *
  * Additional copyrights may follow
@@ -53,10 +54,11 @@
 #include "ompi/mca/topo/base/base.h"
 #include "opal/mca/pmix/base/base.h"
 
-#include "opal/mca/mpool/base/mpool_base_tree.h"
 #include "ompi/mca/pml/base/pml_base_bsend.h"
 #include "ompi/util/timings.h"
+#include "opal/mca/mpool/base/mpool_base_tree.h"
 #include "opal/mca/pmix/pmix-internal.h"
+#include "opal/util/clock_gettime.h"
 
 ompi_predefined_instance_t ompi_mpi_instance_null = {{{{0}}}};
 
@@ -73,6 +75,14 @@ __opal_attribute_constructor__ static void instance_lock_init(void) {
 
 /** MPI_Init instance */
 ompi_instance_t *ompi_mpi_instance_default = NULL;
+
+/**
+ * @brief: Base timer initialization. All timers returned to the user via MPI_Wtime
+ *         are relative to this timer. Setting it early in during the common
+ *         initialization (world or session model) allows for measuring the cost of
+ *         the MPI initialization.
+ */
+struct timespec ompi_wtime_time_origin = {.tv_sec = 0};
 
 enum {
     OMPI_INSTANCE_INITIALIZING = -1,
@@ -115,7 +125,7 @@ static mca_base_framework_t *ompi_framework_dependencies[] = {
     &ompi_hook_base_framework, &ompi_op_base_framework,
     &opal_allocator_base_framework, &opal_rcache_base_framework, &opal_mpool_base_framework, &opal_smsc_base_framework,
     &ompi_bml_base_framework, &ompi_pml_base_framework, &ompi_coll_base_framework,
-    &ompi_osc_base_framework, NULL,
+    &ompi_osc_base_framework, &ompi_part_base_framework, NULL,
 };
 
 static mca_base_framework_t *ompi_lazy_frameworks[] = {
@@ -221,6 +231,8 @@ void ompi_mpi_instance_release (void)
 
     opal_argv_free (ompi_mpi_instance_pmix_psets);
     ompi_mpi_instance_pmix_psets = NULL;
+
+    OBJ_DESTRUCT(&ompi_mpi_instance_null);
 
     opal_finalize_cleanup_domain (&ompi_instance_basic_domain);
     OBJ_DESTRUCT(&ompi_instance_basic_domain);
@@ -355,6 +367,10 @@ static int ompi_mpi_instance_init_common (int argc, char **argv)
     pmix_status_t rc;
     opal_pmix_lock_t mylock;
     OMPI_TIMING_INIT(64);
+
+    // We intentionally don't use the OPAL timer framework here.  See
+    // https://github.com/open-mpi/ompi/issues/3003 for more details.
+    (void) opal_clock_gettime(&ompi_wtime_time_origin);
 
     ret = ompi_mpi_instance_retain ();
     if (OPAL_UNLIKELY(OMPI_SUCCESS != ret)) {
@@ -655,11 +671,7 @@ static int ompi_mpi_instance_init_common (int argc, char **argv)
         return ompi_instance_print_error ("ompi_win_init() failed", ret);
     }
 
-    /* initialize partcomm */
-    if (OMPI_SUCCESS != (ret = mca_base_framework_open(&ompi_part_base_framework, 0))) {
-        return ompi_instance_print_error ("mca_part_base_select() failed", ret);
-    }
-
+    /* select part component to use */
     if (OMPI_SUCCESS != (ret = mca_part_base_select (true, true))) {
         return ompi_instance_print_error ("mca_part_base_select() failed", ret);
     }
@@ -950,16 +962,7 @@ static int ompi_mpi_instance_finalize_common (void)
 
     ompi_proc_finalize();
 
-    OBJ_DESTRUCT(&ompi_mpi_instance_null);
-
     ompi_mpi_instance_release ();
-
-    if (0 == opal_initialized) {
-        /* if there is no MPI_T_init_thread that has been MPI_T_finalize'd,
-         * then be gentle to the app and release all the memory now (instead
-         * of the opal library destructor */
-        opal_class_finalize ();
-    }
 
     return OMPI_SUCCESS;
 }

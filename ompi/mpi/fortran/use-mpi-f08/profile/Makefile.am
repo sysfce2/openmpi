@@ -21,6 +21,7 @@
 #                         and Technology (RIST).  All rights reserved.
 # Copyright (c) 2022      Triad National Security, LLC. All rights
 #                         reserved.
+# Copyright (c) 2024      Jeffrey M. Squyres.  All rights reserved.
 # $COPYRIGHT$
 #
 # Additional copyrights may follow
@@ -45,7 +46,7 @@ AM_FCFLAGS = -I$(top_srcdir)/ompi/mpi/fortran/use-mpi-f08/mod \
              -I$(top_builddir)/ompi/include \
              -I$(top_srcdir)/ompi/include \
              $(OMPI_FC_MODULE_FLAG)$(top_builddir)/ompi/mpi/fortran/use-mpi \
-             $(OMPI_FC_MODULE_FLAG)$(top_builddir)/ompi/$(OMPI_FORTRAN_USEMPI_DIR) \
+             $(OMPI_FC_MODULE_FLAG)$(top_builddir)/ompi/mpi/fortran/use-mpi-ignore-tkr \
              $(OMPI_FC_MODULE_FLAG)../mod \
              $(OMPI_FC_MODULE_FLAG)../bindings \
              -I$(top_srcdir) -I$(top_builddir) $(FCFLAGS_f90) \
@@ -69,6 +70,7 @@ pmpi_api_files = \
         pallgatherv_init_f08.F90 \
         palloc_mem_f08.F90 \
         pallreduce_f08.F90 \
+        pallreduce_init_f08.F90 \
         palltoall_f08.F90 \
         palltoall_init_f08.F90 \
         palltoallv_f08.F90 \
@@ -230,6 +232,7 @@ pmpi_api_files = \
         pgroup_difference_f08.F90 \
         pgroup_excl_f08.F90 \
         pgroup_free_f08.F90 \
+        pgroup_from_session_pset_f08.F90 \
         pgroup_incl_f08.F90 \
         pgroup_intersection_f08.F90 \
         pgroup_range_excl_f08.F90 \
@@ -347,6 +350,7 @@ pmpi_api_files = \
         psend_init_f08.F90 \
         psendrecv_f08.F90 \
         psendrecv_replace_f08.F90 \
+        psession_call_errhandler_f08.F90 \
         psession_create_errhandler_f08.F90\
         psession_get_errhandler_f08.F90\
         psession_get_info_f08.F90 \

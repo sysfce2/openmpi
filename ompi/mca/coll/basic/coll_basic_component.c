@@ -13,6 +13,7 @@
  * Copyright (c) 2008      Cisco Systems, Inc.  All rights reserved.
  * Copyright (c) 2015      Los Alamos National Security, LLC. All rights
  *                         reserved.
+ * Copyright (c) 2024      NVIDIA CORPORATION. All rights reserved.
  * $COPYRIGHT$
  *
  * Additional copyrights may follow
@@ -55,13 +56,13 @@ static int basic_register(void);
  * and pointers to our public functions in it
  */
 
-const mca_coll_base_component_2_4_0_t mca_coll_basic_component = {
+const mca_coll_base_component_3_0_0_t mca_coll_basic_component = {
 
     /* First, the mca_component_t struct containing meta information
      * about the component itself */
 
     .collm_version = {
-        MCA_COLL_BASE_VERSION_2_4_0,
+        MCA_COLL_BASE_VERSION_3_0_0,
 
         /* Component name and version */
         .mca_component_name = "basic",
@@ -91,16 +92,16 @@ basic_register(void)
     mca_coll_basic_priority = 10;
     (void) mca_base_component_var_register(&mca_coll_basic_component.collm_version, "priority",
                                            "Priority of the basic coll component",
-                                           MCA_BASE_VAR_TYPE_INT, NULL, 0, 0,
+                                           MCA_BASE_VAR_TYPE_INT, NULL, 0, MCA_BASE_VAR_FLAG_SETTABLE,
                                            OPAL_INFO_LVL_9,
-                                           MCA_BASE_VAR_SCOPE_READONLY,
+                                           MCA_BASE_VAR_SCOPE_ALL,
                                            &mca_coll_basic_priority);
     mca_coll_basic_crossover = 4;
     (void) mca_base_component_var_register(&mca_coll_basic_component.collm_version, "crossover",
                                            "Minimum number of processes in a communicator before using the logarithmic algorithms",
-                                           MCA_BASE_VAR_TYPE_INT, NULL, 0, 0,
+                                           MCA_BASE_VAR_TYPE_INT, NULL, 0, MCA_BASE_VAR_FLAG_SETTABLE,
                                            OPAL_INFO_LVL_9,
-                                           MCA_BASE_VAR_SCOPE_READONLY,
+                                           MCA_BASE_VAR_SCOPE_ALL,
                                            &mca_coll_basic_crossover);
 
     return OMPI_SUCCESS;

@@ -14,6 +14,9 @@
  * Copyright (c) 2008-2017 University of Houston. All rights reserved.
  * Copyright (c) 2015      Los Alamos National Security, LLC. All rights
  *                         reserved.
+ * Copyright (c) 2024      Triad National Security, LLC. All rights
+ *                         reserved.
+ * Copyright (c) 2024      Advanced Micro Devices, Inc. All rights reserved.
  * $COPYRIGHT$
  *
  * Additional copyrights may follow
@@ -41,8 +44,6 @@ const char *mca_fcoll_vulcan_component_version_string =
  * Global variables
  */
 int mca_fcoll_vulcan_priority = 10;
-int mca_fcoll_vulcan_num_groups = 1;
-int mca_fcoll_vulcan_write_chunksize = -1;
 int mca_fcoll_vulcan_async_io = 0;
 
 /*
@@ -54,13 +55,13 @@ static int vulcan_register(void);
  * Instantiate the public struct with all of our public information
  * and pointers to our public functions in it
  */
-mca_fcoll_base_component_2_0_0_t mca_fcoll_vulcan_component = {
+mca_fcoll_base_component_3_0_0_t mca_fcoll_vulcan_component = {
 
     /* First, the mca_component_t struct containing meta information
      * about the component itself */
 
     .fcollm_version = {
-        MCA_FCOLL_BASE_VERSION_2_0_0,
+        MCA_FCOLL_BASE_VERSION_3_0_0,
 
         /* Component name and version */
         .mca_component_name = "vulcan",
@@ -88,20 +89,6 @@ vulcan_register(void)
                                            MCA_BASE_VAR_TYPE_INT, NULL, 0, 0,
                                            OPAL_INFO_LVL_9,
                                            MCA_BASE_VAR_SCOPE_READONLY, &mca_fcoll_vulcan_priority);
-
-    mca_fcoll_vulcan_num_groups = 1;
-    (void) mca_base_component_var_register(&mca_fcoll_vulcan_component.fcollm_version,
-                                           "num_groups", "Number of subgroups created by the vulcan component",
-                                           MCA_BASE_VAR_TYPE_INT, NULL, 0, 0,
-                                           OPAL_INFO_LVL_9,
-                                           MCA_BASE_VAR_SCOPE_READONLY, &mca_fcoll_vulcan_num_groups);
-
-    mca_fcoll_vulcan_write_chunksize = -1;
-    (void) mca_base_component_var_register(&mca_fcoll_vulcan_component.fcollm_version,
-                                           "write_chunksize", "Chunk size written at once. Default: stripe_size of the file system",
-                                           MCA_BASE_VAR_TYPE_INT, NULL, 0, 0,
-                                           OPAL_INFO_LVL_9,
-                                           MCA_BASE_VAR_SCOPE_READONLY, &mca_fcoll_vulcan_write_chunksize);
 
     mca_fcoll_vulcan_async_io = 0;
     (void) mca_base_component_var_register(&mca_fcoll_vulcan_component.fcollm_version,

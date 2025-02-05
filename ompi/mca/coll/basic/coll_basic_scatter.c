@@ -12,6 +12,7 @@
  * Copyright (c) 2015      Research Organization for Information Science
  *                         and Technology (RIST). All rights reserved.
  * Copyright (c) 2017      IBM Corporation. All rights reserved.
+ * Copyright (c) 2024      NVIDIA Corporation.  All rights reserved.
  * $COPYRIGHT$
  *
  * Additional copyrights may follow
@@ -39,9 +40,9 @@
  *	Returns:	- MPI_SUCCESS or error code
  */
 int
-mca_coll_basic_scatter_inter(const void *sbuf, int scount,
+mca_coll_basic_scatter_inter(const void *sbuf, size_t scount,
                              struct ompi_datatype_t *sdtype,
-                             void *rbuf, int rcount,
+                             void *rbuf, size_t rcount,
                              struct ompi_datatype_t *rdtype,
                              int root, struct ompi_communicator_t *comm,
                              mca_coll_base_module_t *module)
@@ -77,7 +78,7 @@ mca_coll_basic_scatter_inter(const void *sbuf, int scount,
             err = MCA_PML_CALL(isend(ptmp, scount, sdtype, i,
                                      MCA_COLL_BASE_TAG_SCATTER,
                                      MCA_PML_BASE_SEND_STANDARD, comm,
-                                     reqs++));
+                                     &(reqs[i])));
             if (OMPI_SUCCESS != err) {
                 ompi_coll_base_free_reqs(reqs, i + 1);
                 return err;

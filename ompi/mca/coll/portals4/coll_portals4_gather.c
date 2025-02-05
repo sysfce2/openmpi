@@ -215,7 +215,7 @@ setup_gather_buffers_binomial(struct ompi_communicator_t   *comm,
         opal_output_verbose(30, ompi_coll_base_framework.framework_output,
                             "%s:%d:vrank(%d): root - gather_buf(%p) - gather_bytes(%lu)=packed_size(%ld) * size(%d)",
                             __FILE__, __LINE__, vrank,
-                            request->u.gather.gather_buf, request->u.gather.gather_bytes,
+                            (void*)request->u.gather.gather_buf, request->u.gather.gather_bytes,
                             request->u.gather.packed_size, request->u.gather.size);
     } else if (bmtree->tree_nextsize) {
         /*
@@ -238,7 +238,7 @@ setup_gather_buffers_binomial(struct ompi_communicator_t   *comm,
         opal_output_verbose(30, ompi_coll_base_framework.framework_output,
                             "%s:%d:vrank(%d): nonleaf - gather_buf(%p) - gather_bytes(%lu)=packed_size(%ld) * (bmtree->tree_numdescendants(%d) + 1)",
                             __FILE__, __LINE__, vrank,
-                            request->u.gather.gather_buf, request->u.gather.gather_bytes,
+                            (void*)request->u.gather.gather_buf, request->u.gather.gather_bytes,
                             request->u.gather.packed_size, bmtree->tree_numdescendants);
     } else {
         /* leaf nodes, allocate space to pack into and put from */
@@ -257,7 +257,7 @@ setup_gather_buffers_binomial(struct ompi_communicator_t   *comm,
         opal_output_verbose(30, ompi_coll_base_framework.framework_output,
                             "%s:%d:vrank(%d): leaf - gather_buf(%p) - gather_bytes(%lu)=packed_size(%ld)",
                             __FILE__, __LINE__, vrank,
-                            request->u.gather.gather_buf, request->u.gather.gather_bytes,
+                            (void*)request->u.gather.gather_buf, request->u.gather.gather_bytes,
                             request->u.gather.packed_size);
     }
 
@@ -316,7 +316,7 @@ setup_gather_buffers_linear(struct ompi_communicator_t   *comm,
         opal_output_verbose(30, ompi_coll_base_framework.framework_output,
                             "%s:%d:rank(%d): root - gather_buf(%p) - gather_bytes(%lu)=packed_size(%ld) * size(%d)",
                             __FILE__, __LINE__, request->u.gather.my_rank,
-                            request->u.gather.gather_buf, request->u.gather.gather_bytes,
+                            (void*)request->u.gather.gather_buf, request->u.gather.gather_bytes,
                             request->u.gather.packed_size, request->u.gather.size);
     } else {
         /* non-root nodes, allocate space to pack into and put from */
@@ -334,7 +334,7 @@ setup_gather_buffers_linear(struct ompi_communicator_t   *comm,
         opal_output_verbose(30, ompi_coll_base_framework.framework_output,
                             "%s:%d:rank(%d): leaf - gather_buf(%p) - gather_bytes(%lu)=packed_size(%ld)",
                             __FILE__, __LINE__, request->u.gather.my_rank,
-                            request->u.gather.gather_buf, request->u.gather.gather_bytes,
+                            (void*)request->u.gather.gather_buf, request->u.gather.gather_bytes,
                             request->u.gather.packed_size);
     }
 
@@ -505,8 +505,8 @@ err_hdlr:
 }
 
 static int
-ompi_coll_portals4_gather_intra_binomial_top(const void *sbuf, int scount, struct ompi_datatype_t *sdtype,
-                                             void *rbuf, int rcount, struct ompi_datatype_t *rdtype,
+ompi_coll_portals4_gather_intra_binomial_top(const void *sbuf, size_t scount, struct ompi_datatype_t *sdtype,
+                                             void *rbuf, size_t rcount, struct ompi_datatype_t *rdtype,
                                              int root,
                                              struct ompi_communicator_t *comm,
                                              ompi_coll_portals4_request_t *request,
@@ -801,8 +801,8 @@ err_hdlr:
 }
 
 static int
-ompi_coll_portals4_gather_intra_linear_top(const void *sbuf, int scount, struct ompi_datatype_t *sdtype,
-                                           void *rbuf, int rcount, struct ompi_datatype_t *rdtype,
+ompi_coll_portals4_gather_intra_linear_top(const void *sbuf, size_t scount, struct ompi_datatype_t *sdtype,
+                                           void *rbuf, size_t rcount, struct ompi_datatype_t *rdtype,
                                            int root,
                                            struct ompi_communicator_t *comm,
                                            ompi_coll_portals4_request_t *request,
@@ -1212,8 +1212,8 @@ err_hdlr:
 }
 
 int
-ompi_coll_portals4_gather_intra(const void *sbuf, int scount, struct ompi_datatype_t *sdtype,
-                                void *rbuf, int rcount, struct ompi_datatype_t *rdtype,
+ompi_coll_portals4_gather_intra(const void *sbuf, size_t scount, struct ompi_datatype_t *sdtype,
+                                void *rbuf, size_t rcount, struct ompi_datatype_t *rdtype,
                                 int root,
                                 struct ompi_communicator_t *comm,
                                 mca_coll_base_module_t *module)
@@ -1284,8 +1284,8 @@ err_hdlr:
 
 
 int
-ompi_coll_portals4_igather_intra(const void *sbuf, int scount, struct ompi_datatype_t *sdtype,
-                                 void *rbuf, int rcount, struct ompi_datatype_t *rdtype,
+ompi_coll_portals4_igather_intra(const void *sbuf, size_t scount, struct ompi_datatype_t *sdtype,
+                                 void *rbuf, size_t rcount, struct ompi_datatype_t *rdtype,
                                  int root,
                                  struct ompi_communicator_t *comm,
                                  ompi_request_t **ompi_request,

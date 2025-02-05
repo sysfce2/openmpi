@@ -91,7 +91,7 @@ setup_scatter_buffers_linear(struct ompi_communicator_t   *comm,
         opal_output_verbose(30, ompi_coll_base_framework.framework_output,
                             "%s:%d:rank(%d): root - scatter_buf(%p) - scatter_bytes(%lu)=packed_size(%ld) * size(%d)",
                             __FILE__, __LINE__, request->u.scatter.my_rank,
-                            request->u.scatter.scatter_buf, request->u.scatter.scatter_bytes,
+                            (void*)request->u.scatter.scatter_buf, request->u.scatter.scatter_bytes,
                             request->u.scatter.packed_size, request->u.scatter.size);
     } else {
         request->u.scatter.scatter_bytes=request->u.scatter.packed_size;
@@ -104,7 +104,7 @@ setup_scatter_buffers_linear(struct ompi_communicator_t   *comm,
         opal_output_verbose(30, ompi_coll_base_framework.framework_output,
                             "%s:%d:rank(%d): leaf - scatter_buf(%p) - scatter_bytes(%lu)=packed_size(%ld)",
                             __FILE__, __LINE__, request->u.scatter.my_rank,
-                            request->u.scatter.scatter_buf, request->u.scatter.scatter_bytes,
+                            (void*)request->u.scatter.scatter_buf, request->u.scatter.scatter_bytes,
                             request->u.scatter.packed_size);
     }
 
@@ -306,8 +306,8 @@ err_hdlr:
 }
 
 static int
-ompi_coll_portals4_scatter_intra_linear_top(const void *sbuf, int scount, struct ompi_datatype_t *sdtype,
-                                            void *rbuf, int rcount, struct ompi_datatype_t *rdtype,
+ompi_coll_portals4_scatter_intra_linear_top(const void *sbuf, size_t scount, struct ompi_datatype_t *sdtype,
+                                            void *rbuf, size_t rcount, struct ompi_datatype_t *rdtype,
                                             int root,
                                             struct ompi_communicator_t *comm,
                                             ompi_coll_portals4_request_t *request,
@@ -646,8 +646,8 @@ err_hdlr:
 }
 
 int
-ompi_coll_portals4_scatter_intra(const void *sbuf, int scount, struct ompi_datatype_t *sdtype,
-                                 void *rbuf, int rcount, struct ompi_datatype_t *rdtype,
+ompi_coll_portals4_scatter_intra(const void *sbuf, size_t scount, struct ompi_datatype_t *sdtype,
+                                 void *rbuf, size_t rcount, struct ompi_datatype_t *rdtype,
                                  int root,
                                  struct ompi_communicator_t *comm,
                                  mca_coll_base_module_t *module)
@@ -705,8 +705,8 @@ err_hdlr:
 
 
 int
-ompi_coll_portals4_iscatter_intra(const void *sbuf, int scount, struct ompi_datatype_t *sdtype,
-                                 void *rbuf, int rcount, struct ompi_datatype_t *rdtype,
+ompi_coll_portals4_iscatter_intra(const void *sbuf, size_t scount, struct ompi_datatype_t *sdtype,
+                                 void *rbuf, size_t rcount, struct ompi_datatype_t *rdtype,
                                  int root,
                                  struct ompi_communicator_t *comm,
                                  ompi_request_t **ompi_request,

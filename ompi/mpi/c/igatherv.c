@@ -3,7 +3,7 @@
  * Copyright (c) 2004-2007 The Trustees of Indiana University and Indiana
  *                         University Research and Technology
  *                         Corporation.  All rights reserved.
- * Copyright (c) 2004-2020 The University of Tennessee and The University
+ * Copyright (c) 2004-2023 The University of Tennessee and The University
  *                         of Tennessee Research Foundation.  All rights
  *                         reserved.
  * Copyright (c) 2004-2008 High Performance Computing Center Stuttgart,
@@ -48,6 +48,8 @@ int MPI_Igatherv(const void *sendbuf, int sendcount, MPI_Datatype sendtype,
                  MPI_Datatype recvtype, int root, MPI_Comm comm, MPI_Request *request)
 {
     int i, size, err;
+    ompi_count_array_t recvcounts_desc;
+    ompi_disp_array_t displs_desc;
 
     SPC_RECORD(OMPI_SPC_IGATHERV, 1);
 
@@ -191,9 +193,18 @@ int MPI_Igatherv(const void *sendbuf, int sendcount, MPI_Datatype sendtype,
         }
     }
 
+    void* updated_recvbuf;
+    if (OMPI_COMM_IS_INTRA(comm)) {
+        updated_recvbuf = (ompi_comm_rank(comm) == root) ? recvbuf : NULL;
+    } else {
+        updated_recvbuf = (root == MPI_ROOT) ? recvbuf : NULL;
+    }
+
     /* Invoke the coll component to perform the back-end operation */
-    err = comm->c_coll->coll_igatherv(sendbuf, sendcount, sendtype, recvbuf,
-                                     recvcounts, displs, recvtype,
+    OMPI_COUNT_ARRAY_INIT(&recvcounts_desc, recvcounts);
+    OMPI_DISP_ARRAY_INIT(&displs_desc, displs);
+    err = comm->c_coll->coll_igatherv(sendbuf, sendcount, sendtype, updated_recvbuf,
+                                     recvcounts_desc, displs_desc, recvtype,
                                      root, comm, request, comm->c_coll->coll_igatherv_module);
     if (OPAL_LIKELY(OMPI_SUCCESS == err)) {
         if (OMPI_COMM_IS_INTRA(comm)) {

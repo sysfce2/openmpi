@@ -20,7 +20,7 @@
  * Copyright (c) 2014-2020 Research Organization for Information Science
  *                         and Technology (RIST). All rights reserved.
  * Copyright (c) 2018      Amazon.com, Inc. or its affiliates.  All Rights reserved.
- * Copyright (c) 2021-2022 Nanook Consulting.  All rights reserved.
+ * Copyright (c) 2021-2024 Nanook Consulting  All rights reserved.
  * Copyright (c) 2018-2022 Triad National Security, LLC. All rights
  *                         reserved.
  * Copyright (c) 2022      IBM Corporation.  All rights reserved.
@@ -53,6 +53,7 @@
 #include "opal/util/show_help.h"
 #include "opal/util/printf.h"
 #include "opal/mca/hwloc/base/base.h"
+#include "opal/mca/installdirs/base/base.h"
 #include "opal/mca/pmix/base/base.h"
 
 #include "ompi/communicator/communicator.h"
@@ -97,18 +98,6 @@ int ompi_dpm_init(void)
         return OMPI_ERROR;
     }
     return OMPI_SUCCESS;
-}
-
-static int compare_pmix_proc(const void *a, const void *b)
-{
-    const pmix_proc_t *proc_a = (pmix_proc_t *)a;
-    const pmix_proc_t *proc_b = (pmix_proc_t *)b;
-
-    int nspace_dif = strncmp(proc_a->nspace, proc_b->nspace, PMIX_MAX_NSLEN);
-    if (nspace_dif != 0)
-        return nspace_dif;
-
-    return proc_a->rank - proc_b->rank;
 }
 
 int ompi_dpm_connect_accept(ompi_communicator_t *comm, int root,
@@ -394,10 +383,6 @@ bcast_rportlen:
     PMIX_INFO_CONSTRUCT(&tinfo);
     PMIX_INFO_LOAD(&tinfo, PMIX_TIMEOUT, &ompi_pmix_connect_timeout, PMIX_UINT32);
 
-    /*
-     * sort procs so that all ranks call PMIx_Connect() with the processes in same order
-     */
-    qsort(procs, nprocs, sizeof(pmix_proc_t), compare_pmix_proc);
     pret = PMIx_Connect(procs, nprocs, &tinfo, 1);
     PMIX_INFO_DESTRUCT(&tinfo);
     PMIX_PROC_FREE(procs, nprocs);
@@ -429,7 +414,7 @@ bcast_rportlen:
             wildcard_rank.jobid = proc->super.proc_name.jobid;
             wildcard_rank.vpid = OMPI_NAME_WILDCARD->vpid;
             /* retrieve the local peers for the specified jobid */
-            OPAL_MODEX_RECV_VALUE_OPTIONAL(rc, PMIX_LOCAL_PEERS,
+            OPAL_MODEX_RECV_VALUE_IMMEDIATE(rc, PMIX_LOCAL_PEERS,
                                            &wildcard_rank, &val, PMIX_STRING);
             if (OPAL_SUCCESS == rc && NULL != val) {
                 char **peers = opal_argv_split(val, ',');
@@ -1768,9 +1753,9 @@ int ompi_dpm_dyn_finalize(void)
             return OMPI_ERR_OUT_OF_RESOURCE;
         }
 
-        max = opal_pointer_array_get_size(&ompi_mpi_communicators);
+        max = ompi_comm_get_num_communicators();
         for (i=3; i<max; i++) {
-            comm = (ompi_communicator_t*)opal_pointer_array_get_item(&ompi_mpi_communicators,i);
+            comm = ompi_comm_lookup(i);
             if (NULL != comm &&  OMPI_COMM_IS_DYNAMIC(comm)) {
                 objs[j++] = disconnect_init(comm);
             }
@@ -1974,6 +1959,46 @@ static void set_handler_default(int sig)
     sigaction(sig, &act, (struct sigaction *)0);
 }
 
+static char *find_prte(void)
+{
+    char *filename = NULL;
+#if !OMPI_USING_INTERNAL_PRRTE
+    char *prrte_prefix = NULL;
+#endif
+
+    /* 1) Did the user tell us exactly where to find prte? */
+    filename = getenv("OMPI_PRTERUN");
+    if (NULL != filename) {
+        return strdup(filename);
+    }
+
+#if OMPI_USING_INTERNAL_PRRTE
+    /* 2) If using internal PRRTE, use our bindir.  Note that this
+     * will obey OPAL_PREFIX and OPAL_DESTDIR */
+    opal_asprintf(&filename, "%s%sprte", opal_install_dirs.bindir, OPAL_PATH_SEP);
+    return filename;
+#else
+
+    /* 3) Look in ${PRTE_PREFIX}/bin */
+    prrte_prefix = getenv("PRTE_PREFIX");
+    if (NULL != prrte_prefix) {
+        opal_asprintf(&filename, "%s%sbin%sprte", prrte_prefix, OPAL_PATH_SEP, OPAL_PATH_SEP);
+        return filename;
+    }
+
+    /* 4) See if configure told us where to look, if set */
+#if defined(OMPI_PRTERUN_PATH)
+    return strdup(OMPI_PRTERUN_PATH);
+#else
+
+    /* 5) Use path search */
+    filename = opal_find_absolute_path("prte");
+
+    return filename;
+#endif
+#endif
+}
+
 static int start_dvm(char **hostfiles, char **dash_host)
 {
     pmix_status_t pret;
@@ -1987,11 +2012,23 @@ static int start_dvm(char **hostfiles, char **dash_host)
     pmix_info_t info;
     int buffer_length, num_chars_read, chunk;
     char *uri;
+    char *opal_prefix = getenv("OPAL_PREFIX");
+
+    /* as a special case, if OPAL_PREFIX was set and either PRRTE or
+     * PMIx are internal builds, set their prefix variables as well */
+    if (NULL != opal_prefix) {
+#if OMPI_USING_INTERNAL_PRRTE
+        setenv("PRTE_PREFIX", opal_prefix, 1);
+#endif
+#if OPAL_USING_INTERNAL_PMIX
+        setenv("PMIX_PREFIX", opal_prefix, 1);
+#endif
+    }
 
     /* find the prte binary using the install_dirs support - this also
      * checks to ensure that we can see this executable and it *is* executable by us
      */
-    cmd = opal_find_absolute_path("prte");
+    cmd = find_prte();
     if (NULL == cmd) {
         /* guess we couldn't do it - best to abort */
         OMPI_ERROR_LOG(OMPI_ERROR);

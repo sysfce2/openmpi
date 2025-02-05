@@ -17,7 +17,7 @@
 # Copyright (c) 2016      Research Organization for Information Science
 #                         and Technology (RIST). All rights reserved.
 # Copyright (c) 2016-2017 IBM Corporation. All rights reserved.
-# Copyright (c) 2020      Amazon.com, Inc. or its affiliates.
+# Copyright (c) 2020-2024 Amazon.com, Inc. or its affiliates.
 #                         All Rights reserved.
 # Copyright (c) 2021      Google, LLC. All rights reserved.
 # $COPYRIGHT$
@@ -27,9 +27,13 @@
 # $HEADER$
 #
 
-SUBDIRS = keyval
+SUBDIRS = \
+        json \
+        keyval
 
-dist_opaldata_DATA = help-opal-util.txt
+dist_opaldata_DATA = \
+        help-opal-util.txt \
+        json/help-json.txt
 
 AM_LFLAGS = -Popal_show_help_yy
 LEX_OUTPUT_ROOT = lex.opal_show_help_yy
@@ -59,6 +63,7 @@ headers = \
         if.h \
         keyval_parse.h \
         malloc.h \
+        misc.h \
         net.h \
         numtostr.h \
         opal_environ.h \
@@ -127,9 +132,17 @@ libopalutil_core_la_SOURCES += timings.c
 endif
 
 libopalutil_core_la_LIBADD = \
+        json/libopalutil_json.la \
         keyval/libopalutilkeyval.la
 libopalutil_core_la_DEPENDENCIES = \
+        json/libopalutil_json.la \
         keyval/libopalutilkeyval.la
+
+# flex prior to version 2.6.6 uses the POSIX extension fileno()
+# without providing the proper feature test macro, so
+# we add the _POSIX_C_SOURCE macro here.
+# See https://github.com/westes/flex/issues/263
+libopalutil_core_la_CFLAGS = -D_POSIX_C_SOURCE=200809L
 
 # Conditionally install the header files
 

@@ -7,6 +7,7 @@
  *                         reserved.
  * Copyright (c) 2019      Research Organization for Information Science
  *                         and Technology (RIST).  All rights reserved.
+ * Copyright (c) 2024      NVIDIA Corporation.  All rights reserved.
  * $COPYRIGHT$
  *
  * Additional copyrights may follow
@@ -19,51 +20,46 @@
 #include "ompi/constants.h"
 #include "ompi/communicator/communicator.h"
 #include "ompi/mca/coll/coll.h"
+#include "ompi/mca/coll/base/base.h"
 #include "opal/mca/base/mca_base_component_repository.h"
 
-#define MONITORING_SAVE_PREV_COLL_API(__module, __comm, __api)          \
-    do {                                                                \
-        if( NULL != __comm->c_coll->coll_ ## __api ## _module ) {        \
-            __module->real.coll_ ## __api = __comm->c_coll->coll_ ## __api; \
-            __module->real.coll_ ## __api ## _module = __comm->c_coll->coll_ ## __api ## _module; \
-            OBJ_RETAIN(__module->real.coll_ ## __api ## _module);       \
-        } else {                                                        \
-            /* If no function previously provided, do not monitor */    \
-            __module->super.coll_ ## __api = NULL;                      \
-            OPAL_MONITORING_PRINT_WARN("COMM \"%s\": No monitoring available for " \
-                                       "coll_" # __api, __comm->c_name); \
-        }                                                               \
-        if( NULL != __comm->c_coll->coll_i ## __api ## _module ) {       \
-            __module->real.coll_i ## __api = __comm->c_coll->coll_i ## __api; \
-            __module->real.coll_i ## __api ## _module = __comm->c_coll->coll_i ## __api ## _module; \
-            OBJ_RETAIN(__module->real.coll_i ## __api ## _module);      \
-        } else {                                                        \
-            /* If no function previously provided, do not monitor */    \
-            __module->super.coll_i ## __api = NULL;                     \
-            OPAL_MONITORING_PRINT_WARN("COMM \"%s\": No monitoring available for " \
-                                       "coll_i" # __api, __comm->c_name); \
-        }                                                               \
-    } while(0)
+#define MONITORING_INSTALL_COLL_API(__module, __comm, __api)                                                                        \
+    do                                                                                                                              \
+    {                                                                                                                               \
+        if ((NULL != __comm->c_coll->coll_##__api##_module) &&                                                                      \
+            (NULL != __module->super.coll_##__api))                                                                                 \
+        {                                                                                                                           \
+            /* save the current selected collective */                                                                              \
+            MCA_COLL_SAVE_API(__comm, __api, __module->real.coll_##__api, __module->real.coll_##__api##_module, "monitoring");      \
+            /* install our own */                                                                                                   \
+            MCA_COLL_INSTALL_API(__comm, __api, __module->super.coll_##__api, &__module->super, "monitoring");                      \
+        }                                                                                                                           \
+        if ((NULL != __comm->c_coll->coll_i##__api##_module) &&                                                                     \
+            (NULL != __module->super.coll_i##__api))                                                                                \
+        {                                                                                                                           \
+            /* save the current selected collective */                                                                              \
+            MCA_COLL_SAVE_API(__comm, i##__api, __module->real.coll_i##__api, __module->real.coll_i##__api##_module, "monitoring"); \
+            /* install our own */                                                                                                   \
+            MCA_COLL_INSTALL_API(__comm, i##__api, __module->super.coll_i##__api, &__module->super, "monitoring");                  \
+        }                                                                                                                           \
+    } while (0)
 
-#define MONITORING_RELEASE_PREV_COLL_API(__module, __comm, __api)       \
-    do {                                                                \
-        if( NULL != __module->real.coll_ ## __api ## _module ) {        \
-            if( NULL != __module->real.coll_ ## __api ## _module->coll_module_disable ) { \
-                __module->real.coll_ ## __api ## _module->coll_module_disable(__module->real.coll_ ## __api ## _module, __comm); \
-            }                                                           \
-            OBJ_RELEASE(__module->real.coll_ ## __api ## _module);      \
-            __module->real.coll_ ## __api = NULL;                       \
-            __module->real.coll_ ## __api ## _module = NULL;            \
-        }                                                               \
-        if( NULL != __module->real.coll_i ## __api ## _module ) {       \
-            if( NULL != __module->real.coll_i ## __api ## _module->coll_module_disable ) { \
-                __module->real.coll_i ## __api ## _module->coll_module_disable(__module->real.coll_i ## __api ## _module, __comm); \
-            }                                                           \
-            OBJ_RELEASE(__module->real.coll_i ## __api ## _module);     \
-            __module->real.coll_i ## __api = NULL;                      \
-            __module->real.coll_i ## __api ## _module = NULL;           \
-        }                                                               \
-    } while(0)
+#define MONITORING_UNINSTALL_COLL_API(__module, __comm, __api)                                                                         \
+    do                                                                                                                                 \
+    {                                                                                                                                  \
+        if (&__module->super == __comm->c_coll->coll_##__api##_module)                                                                 \
+        {                                                                                                                              \
+            MCA_COLL_INSTALL_API(__comm, __api, __module->real.coll_##__api, __module->real.coll_##__api##_module, "monitoring");      \
+            __module->real.coll_##__api = NULL;                                                                                        \
+            __module->real.coll_##__api##_module = NULL;                                                                               \
+        }                                                                                                                              \
+        if (&__module->super == __comm->c_coll->coll_i##__api##_module)                                                                \
+        {                                                                                                                              \
+            MCA_COLL_INSTALL_API(__comm, i##__api, __module->real.coll_i##__api, __module->real.coll_i##__api##_module, "monitoring"); \
+            __module->real.coll_i##__api = NULL;                                                                                       \
+            __module->real.coll_i##__api##_module = NULL;                                                                              \
+        }                                                                                                                              \
+    } while (0)
 
 #define MONITORING_SET_FULL_PREV_COLL_API(m, c, operation)      \
     do {                                                        \
@@ -91,11 +87,11 @@
         operation(m, c, neighbor_alltoallw);                    \
     } while(0)
 
-#define MONITORING_SAVE_FULL_PREV_COLL_API(m, c)                        \
-    MONITORING_SET_FULL_PREV_COLL_API((m), (c), MONITORING_SAVE_PREV_COLL_API)
+#define MONITORING_SAVE_FULL_PREV_COLL_API(m, c) \
+    MONITORING_SET_FULL_PREV_COLL_API((m), (c), MONITORING_INSTALL_COLL_API)
 
-#define MONITORING_RELEASE_FULL_PREV_COLL_API(m, c)                     \
-    MONITORING_SET_FULL_PREV_COLL_API((m), (c), MONITORING_RELEASE_PREV_COLL_API)
+#define MONITORING_RELEASE_FULL_PREV_COLL_API(m, c) \
+    MONITORING_SET_FULL_PREV_COLL_API((m), (c), MONITORING_UNINSTALL_COLL_API)
 
 static int mca_coll_monitoring_component_open(void)
 {
@@ -125,11 +121,11 @@ static int
 mca_coll_monitoring_module_enable(mca_coll_base_module_t*module, struct ompi_communicator_t*comm)
 {
     mca_coll_monitoring_module_t*monitoring_module = (mca_coll_monitoring_module_t*) module;
-    if( 1 == opal_atomic_add_fetch_32(&monitoring_module->is_initialized, 1) ) {
-        MONITORING_SAVE_FULL_PREV_COLL_API(monitoring_module, comm);
-        monitoring_module->data = mca_common_monitoring_coll_new(comm);
-        OPAL_MONITORING_PRINT_INFO("coll_module_enabled");    
-    }
+
+    MONITORING_SAVE_FULL_PREV_COLL_API(monitoring_module, comm);
+    monitoring_module->data = mca_common_monitoring_coll_new(comm);
+    OPAL_MONITORING_PRINT_INFO("coll_module_enabled");    
+
     return OMPI_SUCCESS;
 }
 
@@ -137,12 +133,12 @@ static int
 mca_coll_monitoring_module_disable(mca_coll_base_module_t*module, struct ompi_communicator_t*comm)
 {
     mca_coll_monitoring_module_t*monitoring_module = (mca_coll_monitoring_module_t*) module;
-    if( 0 == opal_atomic_sub_fetch_32(&monitoring_module->is_initialized, 1) ) {
-        MONITORING_RELEASE_FULL_PREV_COLL_API(monitoring_module, comm);
-        mca_common_monitoring_coll_release(monitoring_module->data);
-        monitoring_module->data = NULL;
-        OPAL_MONITORING_PRINT_INFO("coll_module_disabled");    
-    }
+
+    MONITORING_RELEASE_FULL_PREV_COLL_API(monitoring_module, comm);
+    mca_common_monitoring_coll_release(monitoring_module->data);
+    monitoring_module->data = NULL;
+    OPAL_MONITORING_PRINT_INFO("coll_module_disabled"); 
+
     return OMPI_SUCCESS;
 }
 
@@ -208,9 +204,6 @@ mca_coll_monitoring_component_query(struct ompi_communicator_t*comm, int*priorit
     monitoring_module->super.coll_ineighbor_alltoallv  = mca_coll_monitoring_ineighbor_alltoallv;
     monitoring_module->super.coll_ineighbor_alltoallw  = mca_coll_monitoring_ineighbor_alltoallw;
 
-    /* Initialization flag */
-    monitoring_module->is_initialized = 0;
-
     *priority = mca_coll_monitoring_component.priority;
 
     return &(monitoring_module->super);
@@ -221,7 +214,7 @@ mca_coll_monitoring_component_t mca_coll_monitoring_component = {
         /* First, the mca_base_component_t struct containing meta
            information about the component itself */
         .collm_version = {
-            MCA_COLL_BASE_VERSION_2_4_0,
+            MCA_COLL_BASE_VERSION_3_0_0,
 
             .mca_component_name = "monitoring", /* MCA component name */
             MCA_MONITORING_MAKE_VERSION,

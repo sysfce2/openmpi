@@ -17,7 +17,9 @@
  *                         and Technology (RIST).  All rights reserved.
  * Copyright (c) 2016-2017 IBM Corporation. All rights reserved.
  * Copyright (c) 2018      DataDirect Networks. All rights reserved.
- * Copyright (c) 2022-2023 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (c) 2024      Triad National Security, LLC. All rights
+ *                         reserved.
  * $COPYRIGHT$
  *
  * Additional copyrights may follow
@@ -47,7 +49,7 @@ int mca_io_ompio_max_aggregators_ratio=8;
 int mca_io_ompio_aggregators_cutoff_threshold=3;
 int mca_io_ompio_overwrite_amode = 1;
 int mca_io_ompio_verbose_info_parsing = 0;
-
+int mca_io_ompio_use_accelerator_buffers = 0;
 int mca_io_ompio_grouping_option=5;
 
 /*
@@ -58,7 +60,7 @@ static int open_component(void);
 static int close_component(void);
 static int init_query(bool enable_progress_threads,
                       bool enable_mpi_threads);
-static const struct mca_io_base_module_2_0_0_t *
+static const struct mca_io_base_module_3_0_0_t *
 file_query (struct ompi_file_t *file,
             struct mca_io_base_file_t **private_data,
             int *priority);
@@ -97,12 +99,12 @@ const char *mca_io_ompio_component_version_string =
 "OMPI/MPI OMPIO io MCA component version " OMPI_VERSION;
 
 
-mca_io_base_component_2_0_0_t mca_io_ompio_component = {
+mca_io_base_component_3_0_0_t mca_io_ompio_component = {
     /* First, the mca_base_component_t struct containing meta information
        about the component itself */
 
     .io_version = {
-        MCA_IO_BASE_VERSION_2_0_0,
+        MCA_IO_BASE_VERSION_3_0_0,
         .mca_component_name = "ompio",
         MCA_BASE_MAKE_VERSION(component, OMPI_MAJOR_VERSION, OMPI_MINOR_VERSION,
                               OMPI_RELEASE_VERSION),
@@ -261,6 +263,14 @@ static int register_component(void)
                                            MCA_BASE_VAR_SCOPE_READONLY,
                                            &mca_io_ompio_verbose_info_parsing);
 
+    mca_io_ompio_use_accelerator_buffers = 0;
+    (void) mca_base_component_var_register(&mca_io_ompio_component.io_version,
+                                           "use_accelerator_buffers", "Allow using accelerator buffers"
+                                           "for data aggregation in collective I/O if input buffer is device memory",
+                                           MCA_BASE_VAR_TYPE_INT, NULL, 0, 0,
+                                           OPAL_INFO_LVL_9,
+                                           MCA_BASE_VAR_SCOPE_READONLY, &mca_io_ompio_use_accelerator_buffers);
+
     return OMPI_SUCCESS;
 }
 
@@ -289,7 +299,7 @@ static int init_query(bool enable_progress_threads,
 }
 
 
-static const struct mca_io_base_module_2_0_0_t *
+static const struct mca_io_base_module_3_0_0_t *
 file_query(struct ompi_file_t *file,
            struct mca_io_base_file_t **private_data,
            int *priority)

@@ -425,7 +425,7 @@ segmentedSwap(opal_atomic_int64_t *opcount,
 
 static int
 create_iov_list(const void       *address,
-                int               count,
+                size_t           count,
                 ompi_datatype_t  *datatype,
                 ptl_iovec_t     **ptl_iovec,
                 ptl_size_t       *ptl_iovec_count)
@@ -481,10 +481,10 @@ create_iov_list(const void       *address,
 static int
 get_to_iovec(ompi_osc_portals4_module_t *module,
              const void       *origin_address,
-             int               origin_count,
+             size_t            origin_count,
              ompi_datatype_t  *origin_datatype,
              ptl_process_t     peer,
-             int               target_count,
+             size_t            target_count,
              ompi_datatype_t  *target_datatype,
              size_t            offset,
              ptl_pt_index_t    pt_index,
@@ -496,7 +496,7 @@ get_to_iovec(ompi_osc_portals4_module_t *module,
     ptrdiff_t length, origin_lb, target_lb, extent;
     ptl_md_t md;
 
-    if (module->origin_iovec_md_h != PTL_INVALID_HANDLE) {
+    if (!PtlHandleIsEqual(module->origin_iovec_md_h,PTL_INVALID_HANDLE)) {
         PtlMDRelease(module->origin_iovec_md_h);
         free(module->origin_iovec_list);
         module->origin_iovec_md_h = PTL_INVALID_HANDLE;
@@ -542,7 +542,7 @@ get_to_iovec(ompi_osc_portals4_module_t *module,
     opal_atomic_add_fetch_64(&module->opcount, 1);
 
     OPAL_OUTPUT_VERBOSE((90, ompi_osc_base_framework.framework_output,
-                 "%s,%d Get(origin_count=%d, origin_lb=%lu, target_count=%d, target_lb=%lu, size=%lu, length=%lu, offset=%lu, op_count=%ld)",
+                 "%s,%d Get(origin_count=%d, origin_lb=%lu, target_count=%zu, target_lb=%lu, size=%zu, length=%lu, offset=%lu, op_count=%ld)",
                  __FILE__, __LINE__, origin_count, origin_lb, target_count, target_lb, size, length, offset, module->opcount));
     ret = PtlGet(module->origin_iovec_md_h,
                  (ptl_size_t) origin_lb,
@@ -568,10 +568,10 @@ get_to_iovec(ompi_osc_portals4_module_t *module,
 static int
 atomic_get_to_iovec(ompi_osc_portals4_module_t *module,
                     const void       *origin_address,
-                    int               origin_count,
+                    size_t            origin_count,
                     ompi_datatype_t  *origin_datatype,
                     ptl_process_t     peer,
-                    int               target_count,
+                    size_t            target_count,
                     ompi_datatype_t  *target_datatype,
                     size_t            offset,
                     ptl_pt_index_t    pt_index,
@@ -583,7 +583,7 @@ atomic_get_to_iovec(ompi_osc_portals4_module_t *module,
     ptrdiff_t length, origin_lb, target_lb, extent;
     ptl_md_t md;
 
-    if (module->origin_iovec_md_h != PTL_INVALID_HANDLE) {
+    if (!PtlHandleIsEqual(module->origin_iovec_md_h,PTL_INVALID_HANDLE)) {
         PtlMDRelease(module->origin_iovec_md_h);
         free(module->origin_iovec_list);
         module->origin_iovec_md_h = PTL_INVALID_HANDLE;
@@ -627,7 +627,7 @@ atomic_get_to_iovec(ompi_osc_portals4_module_t *module,
     }
 
     OPAL_OUTPUT_VERBOSE((90, ompi_osc_base_framework.framework_output,
-                 "%s,%d Get(origin_count=%d, origin_lb=%lu, target_count=%d, target_lb=%lu, size=%lu, length=%lu, offset=%lu, op_count=%ld)",
+                 "%s,%d Get(origin_count=%zu, origin_lb=%lu, target_count=%zu, target_lb=%lu, size=%zu, length=%lu, offset=%lu, op_count=%ld)",
                  __FILE__, __LINE__, origin_count, origin_lb, target_count, target_lb, size, length, offset, module->opcount));
     ret = segmentedGet(&module->opcount,
                        module->origin_iovec_md_h,
@@ -650,10 +650,10 @@ atomic_get_to_iovec(ompi_osc_portals4_module_t *module,
 static int
 put_from_iovec(ompi_osc_portals4_module_t *module,
                const void       *origin_address,
-               int               origin_count,
+               size_t            origin_count,
                ompi_datatype_t  *origin_datatype,
                ptl_process_t     peer,
-               int               target_count,
+               size_t            target_count,
                ompi_datatype_t  *target_datatype,
                size_t            offset,
                ptl_pt_index_t    pt_index,
@@ -665,7 +665,7 @@ put_from_iovec(ompi_osc_portals4_module_t *module,
     ptrdiff_t length, origin_lb, target_lb, extent;
     ptl_md_t md;
 
-    if (module->origin_iovec_md_h != PTL_INVALID_HANDLE) {
+    if (!PtlHandleIsEqual(module->origin_iovec_md_h,PTL_INVALID_HANDLE)) {
         PtlMDRelease(module->origin_iovec_md_h);
         free(module->origin_iovec_list);
         module->origin_iovec_md_h = PTL_INVALID_HANDLE;
@@ -711,7 +711,7 @@ put_from_iovec(ompi_osc_portals4_module_t *module,
     opal_atomic_add_fetch_64(&module->opcount, 1);
 
     OPAL_OUTPUT_VERBOSE((90, ompi_osc_base_framework.framework_output,
-                 "%s,%d Put(origin_count=%d, origin_lb=%lu, target_count=%d, target_lb=%lu, size=%lu, length=%lu, offset=%lu, op_count=%ld)",
+                 "%s,%d Put(origin_count=%zu, origin_lb=%lu, target_count=%zu, target_lb=%lu, size=%zu, length=%lu, offset=%lu, op_count=%ld)",
                  __FILE__, __LINE__, origin_count, origin_lb, target_count, target_lb, size, length, offset, module->opcount));
     ret = PtlPut(module->origin_iovec_md_h,
                  (ptl_size_t) origin_lb,
@@ -739,10 +739,10 @@ put_from_iovec(ompi_osc_portals4_module_t *module,
 static int
 atomic_put_from_iovec(ompi_osc_portals4_module_t *module,
                       const void       *origin_address,
-                      int               origin_count,
+                      size_t            origin_count,
                       ompi_datatype_t  *origin_datatype,
                       ptl_process_t     peer,
-                      int               target_count,
+                      size_t            target_count,
                       ompi_datatype_t  *target_datatype,
                       size_t            offset,
                       ptl_pt_index_t    pt_index,
@@ -754,7 +754,7 @@ atomic_put_from_iovec(ompi_osc_portals4_module_t *module,
     ptrdiff_t length, origin_lb, target_lb, extent;
     ptl_md_t md;
 
-    if (module->origin_iovec_md_h != PTL_INVALID_HANDLE) {
+    if (!PtlHandleIsEqual(module->origin_iovec_md_h,PTL_INVALID_HANDLE)) {
         PtlMDRelease(module->origin_iovec_md_h);
         free(module->origin_iovec_list);
         module->origin_iovec_md_h = PTL_INVALID_HANDLE;
@@ -798,7 +798,7 @@ atomic_put_from_iovec(ompi_osc_portals4_module_t *module,
     }
 
     OPAL_OUTPUT_VERBOSE((90, ompi_osc_base_framework.framework_output,
-                 "%s,%d Put(origin_count=%d, origin_lb=%lu, target_count=%d, target_lb=%lu, length=%lu, op_count=%ld)",
+                 "%s,%d Put(origin_count=%zu, origin_lb=%lu, target_count=%zu, target_lb=%lu, length=%lu, op_count=%ld)",
                  __FILE__, __LINE__, origin_count, origin_lb, target_count, target_lb, length, module->opcount));
     ret = segmentedPut(&module->opcount,
                        module->origin_iovec_md_h,
@@ -823,10 +823,10 @@ atomic_put_from_iovec(ompi_osc_portals4_module_t *module,
 static int
 atomic_from_iovec(ompi_osc_portals4_module_t *module,
                   const void       *origin_address,
-                  int               origin_count,
+                  size_t            origin_count,
                   ompi_datatype_t  *origin_datatype,
                   ptl_process_t     peer,
-                  int               target_count,
+                  size_t            target_count,
                   ompi_datatype_t  *target_datatype,
                   size_t            offset,
                   ptl_pt_index_t    pt_index,
@@ -841,7 +841,7 @@ atomic_from_iovec(ompi_osc_portals4_module_t *module,
     ptl_op_t ptl_op;
     ptl_datatype_t ptl_dt;
 
-    if (module->origin_iovec_md_h != PTL_INVALID_HANDLE) {
+    if (!PtlHandleIsEqual(module->origin_iovec_md_h,PTL_INVALID_HANDLE)) {
         PtlMDRelease(module->origin_iovec_md_h);
         free(module->origin_iovec_list);
         module->origin_iovec_md_h = PTL_INVALID_HANDLE;
@@ -920,13 +920,13 @@ atomic_from_iovec(ompi_osc_portals4_module_t *module,
 static int
 swap_to_iovec(ompi_osc_portals4_module_t *module,
               const void       *result_address,
-              int               result_count,
+              size_t            result_count,
               ompi_datatype_t  *result_datatype,
               const void       *origin_address,
-              int               origin_count,
+              size_t            origin_count,
               ompi_datatype_t  *origin_datatype,
               ptl_process_t     peer,
-              int               target_count,
+              size_t            target_count,
               ompi_datatype_t  *target_datatype,
               size_t            offset,
               ptl_pt_index_t    pt_index,
@@ -940,7 +940,7 @@ swap_to_iovec(ompi_osc_portals4_module_t *module,
     ptl_md_t md;
     ptl_datatype_t ptl_dt;
 
-    if (module->result_iovec_md_h != PTL_INVALID_HANDLE) {
+    if (!PtlHandleIsEqual(module->result_iovec_md_h,PTL_INVALID_HANDLE)) {
         PtlMDRelease(module->result_iovec_md_h);
         free(module->result_iovec_list);
         module->result_iovec_md_h = PTL_INVALID_HANDLE;
@@ -971,7 +971,7 @@ swap_to_iovec(ompi_osc_portals4_module_t *module,
         return ret;
     }
 
-    if (module->origin_iovec_md_h != PTL_INVALID_HANDLE) {
+    if (!PtlHandleIsEqual(module->origin_iovec_md_h,PTL_INVALID_HANDLE)) {
         PtlMDRelease(module->origin_iovec_md_h);
         free(module->origin_iovec_list);
         module->origin_iovec_md_h = PTL_INVALID_HANDLE;
@@ -1044,13 +1044,13 @@ swap_to_iovec(ompi_osc_portals4_module_t *module,
 static int
 fetch_atomic_to_iovec(ompi_osc_portals4_module_t *module,
                       const void       *result_address,
-                      int               result_count,
+                      size_t            result_count,
                       ompi_datatype_t  *result_datatype,
                       const void       *origin_address,
-                      int               origin_count,
+                      size_t            origin_count,
                       ompi_datatype_t  *origin_datatype,
                       ptl_process_t     peer,
-                      int               target_count,
+                      size_t            target_count,
                       ompi_datatype_t  *target_datatype,
                       size_t            offset,
                       ptl_pt_index_t    pt_index,
@@ -1066,7 +1066,7 @@ fetch_atomic_to_iovec(ompi_osc_portals4_module_t *module,
     ptl_op_t ptl_op;
     ptl_datatype_t ptl_dt;
 
-    if (module->result_iovec_md_h != PTL_INVALID_HANDLE) {
+    if (!PtlHandleIsEqual(module->result_iovec_md_h,PTL_INVALID_HANDLE)) {
         PtlMDRelease(module->result_iovec_md_h);
         free(module->result_iovec_list);
         module->result_iovec_md_h = PTL_INVALID_HANDLE;
@@ -1097,7 +1097,7 @@ fetch_atomic_to_iovec(ompi_osc_portals4_module_t *module,
         return ret;
     }
 
-    if (module->origin_iovec_md_h != PTL_INVALID_HANDLE) {
+    if (!PtlHandleIsEqual(module->origin_iovec_md_h,PTL_INVALID_HANDLE)) {
         PtlMDRelease(module->origin_iovec_md_h);
         free(module->origin_iovec_list);
         module->origin_iovec_md_h = PTL_INVALID_HANDLE;
@@ -1182,10 +1182,10 @@ static int
 put_to_noncontig(opal_atomic_int64_t *opcount,
                  ptl_handle_md_t   md_h,
                  const void       *origin_address,
-                 int               origin_count,
+                 size_t            origin_count,
                  ompi_datatype_t  *origin_datatype,
                  ptl_process_t     peer,
-                 int               target_count,
+                 size_t            target_count,
                  ompi_datatype_t  *target_datatype,
                  size_t            offset,
                  ptl_pt_index_t    pt_index,
@@ -1291,10 +1291,10 @@ static int
 atomic_put_to_noncontig(ompi_osc_portals4_module_t *module,
                         ptl_handle_md_t   md_h,
                         const void       *origin_address,
-                        int               origin_count,
+                        size_t            origin_count,
                         ompi_datatype_t  *origin_datatype,
                         ptl_process_t     peer,
-                        int               target_count,
+                        size_t            target_count,
                         ompi_datatype_t  *target_datatype,
                         size_t            offset,
                         ptl_pt_index_t    pt_index,
@@ -1394,10 +1394,10 @@ static int
 atomic_to_noncontig(ompi_osc_portals4_module_t *module,
                     ptl_handle_md_t   md_h,
                     const void       *origin_address,
-                    int               origin_count,
+                    size_t            origin_count,
                     ompi_datatype_t  *origin_datatype,
                     ptl_process_t     peer,
-                    int               target_count,
+                    size_t            target_count,
                     ompi_datatype_t  *target_datatype,
                     size_t            offset,
                     ptl_pt_index_t    pt_index,
@@ -1516,10 +1516,10 @@ static int
 get_from_noncontig(opal_atomic_int64_t *opcount,
                    ptl_handle_md_t   md_h,
                    const void       *origin_address,
-                   int               origin_count,
+                   size_t            origin_count,
                    ompi_datatype_t  *origin_datatype,
                    ptl_process_t     peer,
-                   int               target_count,
+                   size_t            target_count,
                    ompi_datatype_t  *target_datatype,
                    size_t            offset,
                    ptl_pt_index_t    pt_index,
@@ -1617,10 +1617,10 @@ static int
 atomic_get_from_noncontig(ompi_osc_portals4_module_t *module,
                           ptl_handle_md_t   md_h,
                           const void       *origin_address,
-                          int               origin_count,
+                          size_t            origin_count,
                           ompi_datatype_t  *origin_datatype,
                           ptl_process_t     peer,
-                          int               target_count,
+                          size_t            target_count,
                           ompi_datatype_t  *target_datatype,
                           size_t            offset,
                           ptl_pt_index_t    pt_index,
@@ -1718,14 +1718,14 @@ static int
 swap_from_noncontig(ompi_osc_portals4_module_t *module,
                     ptl_handle_md_t   result_md_h,
                     const void       *result_address,
-                    int               result_count,
+                    size_t            result_count,
                     ompi_datatype_t  *result_datatype,
                     ptl_handle_md_t   origin_md_h,
                     const void       *origin_address,
-                    int               origin_count,
+                    size_t            origin_count,
                     ompi_datatype_t  *origin_datatype,
                     ptl_process_t     peer,
-                    int               target_count,
+                    size_t            target_count,
                     ompi_datatype_t  *target_datatype,
                     size_t            offset,
                     ptl_pt_index_t    pt_index,
@@ -1862,14 +1862,14 @@ static int
 fetch_atomic_from_noncontig(ompi_osc_portals4_module_t *module,
                             ptl_handle_md_t   result_md_h,
                             const void       *result_address,
-                            int               result_count,
+                            size_t            result_count,
                             ompi_datatype_t  *result_datatype,
                             ptl_handle_md_t   origin_md_h,
                             const void       *origin_address,
-                            int               origin_count,
+                            size_t            origin_count,
                             ompi_datatype_t  *origin_datatype,
                             ptl_process_t     peer,
-                            int               target_count,
+                            size_t            target_count,
                             ompi_datatype_t  *target_datatype,
                             size_t            offset,
                             ptl_pt_index_t    pt_index,
@@ -2010,11 +2010,11 @@ fetch_atomic_from_noncontig(ompi_osc_portals4_module_t *module,
 
 int
 ompi_osc_portals4_rput(const void *origin_addr,
-                       int origin_count,
+                       size_t origin_count,
                        struct ompi_datatype_t *origin_dt,
                        int target,
                        ptrdiff_t target_disp,
-                       int target_count,
+                       size_t target_count,
                        struct ompi_datatype_t *target_dt,
                        struct ompi_win_t *win,
                        struct ompi_request_t **ompi_req)
@@ -2028,7 +2028,7 @@ ompi_osc_portals4_rput(const void *origin_addr,
     ptrdiff_t length, origin_lb, target_lb, extent;
 
     OPAL_OUTPUT_VERBOSE((50, ompi_osc_base_framework.framework_output,
-                         "rput: 0x%lx, %d, %s, %d, %lu, %d, %s, 0x%lx",
+                         "rput: 0x%lx, %zu, %s, %d, %lu, %zu, %s, 0x%lx",
                          (unsigned long) origin_addr, origin_count,
                          origin_dt->name, target, (unsigned long) target_disp,
                          target_count, target_dt->name,
@@ -2096,7 +2096,7 @@ ompi_osc_portals4_rput(const void *origin_addr,
         request->ops_expected += number_of_fragments(length, mca_osc_portals4_component.ptl_max_msg_size);
 
         OPAL_OUTPUT_VERBOSE((90, ompi_osc_base_framework.framework_output,
-                     "%s,%d RPut(origin_count=%d, origin_lb=%lu, target_count=%d, target_lb=%lu, length=%lu, op_count=%ld)",
+                     "%s,%d RPut(origin_count=%zu, origin_lb=%lu, target_count=%zu, target_lb=%lu, length=%lu, op_count=%ld)",
                      __FILE__, __LINE__, origin_count, origin_lb, target_count, target_lb, length, module->opcount));
         ret = segmentedPut(&module->opcount,
                            module->req_md_h,
@@ -2122,11 +2122,11 @@ ompi_osc_portals4_rput(const void *origin_addr,
 
 int
 ompi_osc_portals4_rget(void *origin_addr,
-                       int origin_count,
+                       size_t origin_count,
                        struct ompi_datatype_t *origin_dt,
                        int target,
                        ptrdiff_t target_disp,
-                       int target_count,
+                       size_t target_count,
                        struct ompi_datatype_t *target_dt,
                        struct ompi_win_t *win,
                        struct ompi_request_t **ompi_req)
@@ -2140,7 +2140,7 @@ ompi_osc_portals4_rget(void *origin_addr,
     ptrdiff_t length, origin_lb, target_lb, extent;
 
     OPAL_OUTPUT_VERBOSE((50, ompi_osc_base_framework.framework_output,
-                         "rget: 0x%lx, %d, %s, %d, %lu, %d, %s, 0x%lx",
+                         "rget: 0x%lx, %zu, %s, %d, %lu, %zu, %s, 0x%lx",
                          (unsigned long) origin_addr, origin_count,
                          origin_dt->name, target, (unsigned long) target_disp,
                          target_count, target_dt->name,
@@ -2227,11 +2227,11 @@ ompi_osc_portals4_rget(void *origin_addr,
 
 int
 ompi_osc_portals4_raccumulate(const void *origin_addr,
-                              int origin_count,
+                              size_t origin_count,
                               struct ompi_datatype_t *origin_dt,
                               int target,
                               ptrdiff_t target_disp,
-                              int target_count,
+                              size_t target_count,
                               struct ompi_datatype_t *target_dt,
                               struct ompi_op_t *op,
                               struct ompi_win_t *win,
@@ -2245,10 +2245,11 @@ ompi_osc_portals4_raccumulate(const void *origin_addr,
     size_t offset, size;
     ptl_op_t ptl_op;
     ptl_datatype_t ptl_dt;
-    ptrdiff_t sent, length, origin_lb, target_lb, extent;
+    ptl_size_t sent, length;
+    ptrdiff_t origin_lb, target_lb, extent;
 
     OPAL_OUTPUT_VERBOSE((50, ompi_osc_base_framework.framework_output,
-                         "raccumulate: 0x%lx, %d, %s, %d, %lu, %d, %s, %s 0x%lx",
+                         "raccumulate: 0x%lx, %zu, %s, %d, %lu, %zu, %s, %s 0x%lx",
                          (unsigned long) origin_addr, origin_count,
                          origin_dt->name, target, (unsigned long) target_disp,
                          target_count, target_dt->name,
@@ -2435,14 +2436,14 @@ ompi_osc_portals4_raccumulate(const void *origin_addr,
 
 int
 ompi_osc_portals4_rget_accumulate(const void *origin_addr,
-                                  int origin_count,
+                                  size_t origin_count,
                                   struct ompi_datatype_t *origin_dt,
                                   void *result_addr,
-                                  int result_count,
+                                  size_t result_count,
                                   struct ompi_datatype_t *result_dt,
                                   int target,
                                   ptrdiff_t target_disp,
-                                  int target_count,
+                                  size_t target_count,
                                   struct ompi_datatype_t *target_dt,
                                   struct ompi_op_t *op,
                                   struct ompi_win_t *win,
@@ -2459,7 +2460,7 @@ ompi_osc_portals4_rget_accumulate(const void *origin_addr,
     ptrdiff_t length, origin_lb, target_lb, result_lb, extent;
 
     OPAL_OUTPUT_VERBOSE((50, ompi_osc_base_framework.framework_output,
-                         "rget_accumulate: 0x%lx, %d, %s, 0x%lx, %d, %s, %d, %lu, %d, %s, %s, 0x%lx",
+                         "rget_accumulate: 0x%lx, %zu, %s, 0x%lx, %zu, %s, %d, %lu, %zu, %s, %s, 0x%lx",
                          (unsigned long) origin_addr, origin_count,
                          origin_dt->name, (unsigned long) result_addr,
                          result_count, result_dt->name,
@@ -2787,11 +2788,11 @@ ompi_osc_portals4_rget_accumulate(const void *origin_addr,
 
 int
 ompi_osc_portals4_put(const void *origin_addr,
-                      int origin_count,
+                      size_t origin_count,
                       struct ompi_datatype_t *origin_dt,
                       int target,
                       ptrdiff_t target_disp,
-                      int target_count,
+                      size_t target_count,
                       struct ompi_datatype_t *target_dt,
                       struct ompi_win_t *win)
 {
@@ -2803,7 +2804,7 @@ ompi_osc_portals4_put(const void *origin_addr,
     ptrdiff_t length, origin_lb, target_lb, extent;
 
     OPAL_OUTPUT_VERBOSE((50, ompi_osc_base_framework.framework_output,
-                         "put: 0x%lx, %d, %s, %d, %lu, %d, %s, 0x%lx",
+                         "put: 0x%lx, %zu, %s, %d, %lu, %zu, %s, 0x%lx",
                          (unsigned long) origin_addr, origin_count,
                          origin_dt->name, target, (unsigned long) target_disp,
                          target_count, target_dt->name,
@@ -2861,7 +2862,7 @@ ompi_osc_portals4_put(const void *origin_addr,
         length = size * origin_count;
 
         OPAL_OUTPUT_VERBOSE((90, ompi_osc_base_framework.framework_output,
-                     "%s,%d Put(origin_count=%d, origin_lb=%lu, target_count=%d, target_lb=%lu, length=%lu, op_count=%ld)",
+                     "%s,%d Put(origin_count=%zu, origin_lb=%lu, target_count=%zu, target_lb=%lu, length=%lu, op_count=%ld)",
                      __FILE__, __LINE__, origin_count, origin_lb, target_count, target_lb, length, module->opcount));
         ret = segmentedPut(&module->opcount,
                            module->md_h,
@@ -2886,11 +2887,11 @@ ompi_osc_portals4_put(const void *origin_addr,
 
 int
 ompi_osc_portals4_get(void *origin_addr,
-                      int origin_count,
+                      size_t origin_count,
                       struct ompi_datatype_t *origin_dt,
                       int target,
                       ptrdiff_t target_disp,
-                      int target_count,
+                      size_t target_count,
                       struct ompi_datatype_t *target_dt,
                       struct ompi_win_t *win)
 {
@@ -2902,7 +2903,7 @@ ompi_osc_portals4_get(void *origin_addr,
     ptrdiff_t length, origin_lb, target_lb, extent;
 
     OPAL_OUTPUT_VERBOSE((50, ompi_osc_base_framework.framework_output,
-                         "get: 0x%lx, %d, %s, %d, %lu, %d, %s, 0x%lx",
+                         "get: 0x%lx, %zu, %s, %d, %lu, %zu, %s, 0x%lx",
                          (unsigned long) origin_addr, origin_count,
                          origin_dt->name, target, (unsigned long) target_disp,
                          target_count, target_dt->name,
@@ -2982,11 +2983,11 @@ ompi_osc_portals4_get(void *origin_addr,
 
 int
 ompi_osc_portals4_accumulate(const void *origin_addr,
-                             int origin_count,
+                             size_t origin_count,
                              struct ompi_datatype_t *origin_dt,
                              int target,
                              ptrdiff_t target_disp,
-                             int target_count,
+                             size_t target_count,
                              struct ompi_datatype_t *target_dt,
                              struct ompi_op_t *op,
                              struct ompi_win_t *win)
@@ -2998,10 +2999,11 @@ ompi_osc_portals4_accumulate(const void *origin_addr,
     size_t offset, size;
     ptl_op_t ptl_op;
     ptl_datatype_t ptl_dt;
-    ptrdiff_t sent, length, origin_lb, target_lb, extent;
+    ptl_size_t sent, length;
+    ptrdiff_t origin_lb, target_lb, extent;
 
     OPAL_OUTPUT_VERBOSE((50, ompi_osc_base_framework.framework_output,
-                         "accumulate: 0x%lx, %d, %s, %d, %lu, %d, %s, %s, 0x%lx",
+                         "accumulate: 0x%lx, %zu, %s, %d, %lu, %zu, %s, %s, 0x%lx",
                          (unsigned long) origin_addr, origin_count,
                          origin_dt->name, target, (unsigned long) target_disp,
                          target_count, target_dt->name,
@@ -3172,14 +3174,14 @@ ompi_osc_portals4_accumulate(const void *origin_addr,
 
 int
 ompi_osc_portals4_get_accumulate(const void *origin_addr,
-                                 int origin_count,
+                                 size_t origin_count,
                                  struct ompi_datatype_t *origin_dt,
                                  void *result_addr,
-                                 int result_count,
+                                 size_t result_count,
                                  struct ompi_datatype_t *result_dt,
                                  int target,
                                  ptrdiff_t target_disp,
-                                 int target_count,
+                                 size_t target_count,
                                  struct ompi_datatype_t *target_dt,
                                  struct ompi_op_t *op,
                                  struct ompi_win_t *win)
@@ -3194,7 +3196,7 @@ ompi_osc_portals4_get_accumulate(const void *origin_addr,
     ptrdiff_t length, origin_lb, target_lb, result_lb, extent;
 
     OPAL_OUTPUT_VERBOSE((50, ompi_osc_base_framework.framework_output,
-                         "get_accumulate: 0x%lx, %d, %s, 0x%lx, %d, %s, %d, %lu, %d, %s, %s, 0x%lx",
+                         "get_accumulate: 0x%lx, %zu, %s, 0x%lx, %zu, %s, %d, %lu, %zu, %s, %s, 0x%lx",
                          (unsigned long) origin_addr, origin_count,
                          origin_dt->name, (unsigned long) result_addr,
                          result_count, result_dt->name,

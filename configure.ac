@@ -103,7 +103,7 @@ AS_IF([test "$host" != "$target"],
 #
 # Init automake
 #
-AM_INIT_AUTOMAKE([foreign dist-bzip2 subdir-objects no-define 1.13.4 tar-ustar])
+AM_INIT_AUTOMAKE([foreign dist-bzip2 subdir-objects no-define 1.13.4 tar-pax])
 
 # SILENT_RULES is new in AM 1.11, but we require 1.11 or higher via
 # autogen.  Limited testing shows that calling SILENT_RULES directly
@@ -172,7 +172,6 @@ AC_SUBST(libopen_pal_so_version)
 AC_SUBST(libmca_opal_common_ofi_so_version)
 AC_SUBST(libmca_opal_common_cuda_so_version)
 AC_SUBST(libmca_opal_common_sm_so_version)
-AC_SUBST(libmca_opal_common_ugni_so_version)
 AC_SUBST(libmca_ompi_common_ompio_so_version)
 AC_SUBST(libmca_ompi_common_monitoring_so_version)
 AC_SUBST(libmca_opal_common_ucx_so_version)

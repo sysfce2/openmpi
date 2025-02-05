@@ -4,7 +4,7 @@
  * Copyright (c) 2019      Intel, Inc.  All rights reserved.
  * Copyright (c) 2019      Research Organization for Information Science
  *                         and Technology (RIST).  All rights reserved.
- * Copyright (c) 2021      Triad National Security, LLC. All rights
+ * Copyright (c) 2021-2024 Triad National Security, LLC. All rights
  *                         reserved.
  * Copyright (c) 2022      Google, LLC. All rights reserved.
  * Copyright (c) 2022      IBM Corporation.  All rights reserved.
@@ -27,6 +27,8 @@
 #include "opal/util/argv.h"
 #include "opal/util/printf.h"
 
+#include "mpi.h"
+
 #include <fnmatch.h>
 #include <stdio.h>
 #include <ucm/api/ucm.h>
@@ -48,6 +50,23 @@ static opal_mutex_t opal_common_ucx_mutex = OPAL_MUTEX_STATIC_INIT;
 static void opal_common_ucx_mem_release_cb(void *buf, size_t length, void *cbdata, bool from_alloc)
 {
     ucm_vm_munmap(buf, length);
+}
+
+ucs_thread_mode_t opal_common_ucx_thread_mode(int ompi_mode)
+{
+    switch (ompi_mode) {
+    case MPI_THREAD_MULTIPLE:
+        return UCS_THREAD_MODE_MULTI;
+    case MPI_THREAD_SERIALIZED:
+        return UCS_THREAD_MODE_SERIALIZED;
+    case MPI_THREAD_FUNNELED:
+    case MPI_THREAD_SINGLE:
+        return UCS_THREAD_MODE_SINGLE;
+    default:
+        MCA_COMMON_UCX_WARN("Unknown MPI thread mode %d, using multithread",
+                            ompi_mode);
+        return UCS_THREAD_MODE_MULTI;
+    }
 }
 
 OPAL_DECLSPEC void opal_common_ucx_mca_var_register(const mca_base_component_t *component)
@@ -88,6 +107,10 @@ OPAL_DECLSPEC void opal_common_ucx_mca_var_register(const mca_base_component_t *
         // cleans up the MCA vars. This will cause the string to go
         // out of scope unless we place the pointer to it on the heap.
         opal_common_ucx.tls = (char **) malloc(sizeof(char *));
+        *opal_common_ucx.tls = NULL;
+    }
+
+    if (NULL == *opal_common_ucx.tls) {
         *opal_common_ucx.tls = strdup(default_tls);
     }
 
@@ -103,8 +126,13 @@ OPAL_DECLSPEC void opal_common_ucx_mca_var_register(const mca_base_component_t *
 
     if (NULL == opal_common_ucx.devices) {
         opal_common_ucx.devices = (char**) malloc(sizeof(char*));
+        *opal_common_ucx.devices = NULL;
+    }
+
+    if (NULL == *opal_common_ucx.devices) {
         *opal_common_ucx.devices = strdup(default_devices);
     }
+
     devices_index = mca_base_var_register(
         "opal", "opal_common", "ucx", "devices",
         "List of device driver pattern names, which, if supported by UCX, will "

@@ -2,7 +2,7 @@
 # Copyright (c) 2018-2020 The University of Tennessee and The University
 #                         of Tennessee Research Foundation.  All rights
 #                         reserved.
-# Copyright (c) 2022      Amazon.com, Inc. or its affiliates.  All Rights reserved.
+# Copyright (c) 2024      Amazon.com, Inc. or its affiliates.  All Rights reserved.
 # Copyright (c) 2022      BULL S.A.S. All rights reserved.
 # $COPYRIGHT$
 #
@@ -15,13 +15,17 @@ sources = \
 coll_han.h \
 coll_han_trigger.h \
 coll_han_algorithms.h \
+coll_han_alltoall.c \
+coll_han_alltoallv.c \
 coll_han_dynamic.h \
 coll_han_dynamic_file.h \
 coll_han_barrier.c \
 coll_han_bcast.c \
 coll_han_reduce.c \
 coll_han_scatter.c \
+coll_han_scatterv.c \
 coll_han_gather.c \
+coll_han_gatherv.c \
 coll_han_allreduce.c \
 coll_han_allgather.c \
 coll_han_component.c \

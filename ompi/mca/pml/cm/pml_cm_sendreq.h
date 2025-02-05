@@ -375,6 +375,10 @@ do {                                                                    \
             iov.iov_base = (IOVBASE_TYPE*)sendreq->req_buff;            \
             max_data = iov.iov_len = sendreq->req_count;                \
             iov_count = 1;                                              \
+            opal_convertor_prepare_for_send( &sendreq->req_send.req_base.req_convertor, \
+                                             &sendreq->req_send.req_base.req_datatype->super,   \
+                                             max_data,                  \
+                                             sendreq->req_addr);        \
             opal_convertor_pack( &sendreq->req_send.req_base.req_convertor, \
                                  &iov,                                  \
                                  &iov_count,                            \
@@ -455,7 +459,7 @@ do {                                                                            
 #define MCA_PML_CM_HVY_SEND_REQUEST_RETURN(sendreq)                     \
     {                                                                   \
         /*  Let the base handle the reference counts */                 \
-        OMPI_DATATYPE_RETAIN(sendreq->req_send.req_base.req_datatype);  \
+        OMPI_DATATYPE_RELEASE(sendreq->req_send.req_base.req_datatype);  \
         OBJ_RELEASE(sendreq->req_send.req_base.req_comm);               \
         OMPI_REQUEST_FINI(&sendreq->req_send.req_base.req_ompi);        \
         opal_convertor_cleanup( &(sendreq->req_send.req_base.req_convertor) ); \
@@ -492,7 +496,7 @@ do {                                                                         \
 #define MCA_PML_CM_THIN_SEND_REQUEST_RETURN(sendreq)                    \
     {                                                                   \
         /*  Let the base handle the reference counts */                 \
-        OMPI_DATATYPE_RETAIN(sendreq->req_send.req_base.req_datatype);  \
+        OMPI_DATATYPE_RELEASE(sendreq->req_send.req_base.req_datatype);  \
         OBJ_RELEASE(sendreq->req_send.req_base.req_comm);               \
         OMPI_REQUEST_FINI(&sendreq->req_send.req_base.req_ompi);        \
         opal_convertor_cleanup( &(sendreq->req_send.req_base.req_convertor) ); \

@@ -42,7 +42,7 @@ AM_FCFLAGS = -I$(top_srcdir)/ompi/mpi/fortran/use-mpi-f08/mod \
              -I$(top_builddir)/ompi/include \
              -I$(top_srcdir)/ompi/include \
              $(OMPI_FC_MODULE_FLAG)$(top_builddir)/ompi/mpi/fortran/use-mpi \
-             $(OMPI_FC_MODULE_FLAG)$(top_builddir)/ompi/$(OMPI_FORTRAN_USEMPI_DIR) \
+             $(OMPI_FC_MODULE_FLAG)$(top_builddir)/ompi/mpi/fortran/use-mpi-ignore-tkr \
              $(OMPI_FC_MODULE_FLAG)mod \
              $(OMPI_FC_MODULE_FLAG)bindings \
              -I$(top_srcdir) -I$(top_builddir) $(FCFLAGS_f90) \
@@ -566,14 +566,14 @@ mpi-f08.lo: $(module_sentinel_files) $(SIZEOF_H)
 
 install-exec-hook:
 	@ for file in `ls *.mod`; do \
-	  echo $(INSTALL) $$file $(DESTDIR)$(libdir); \
-	  $(INSTALL) $$file $(DESTDIR)$(libdir); \
+	  echo $(INSTALL) $$file $(DESTDIR)$(OMPI_FORTRAN_MODULEDIR); \
+	  $(INSTALL) $$file $(DESTDIR)$(OMPI_FORTRAN_MODULEDIR); \
 	done
 
 uninstall-local:
 	@ for file in `ls *.mod`; do \
-	  echo rm -f $(DESTDIR)$(libdir)/$$file; \
-	  rm -f $(DESTDIR)$(libdir)/$$file; \
+	  echo rm -f $(DESTDIR)$(OMPI_FORTRAN_MODULEDIR)/$$file; \
+	  rm -f $(DESTDIR)$(OMPI_FORTRAN_MODULEDIR)/$$file; \
 	done
 
 endif

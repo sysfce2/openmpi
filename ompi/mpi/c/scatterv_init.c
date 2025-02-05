@@ -3,7 +3,7 @@
  * Copyright (c) 2004-2007 The Trustees of Indiana University and Indiana
  *                         University Research and Technology
  *                         Corporation.  All rights reserved.
- * Copyright (c) 2004-2020 The University of Tennessee and The University
+ * Copyright (c) 2004-2023 The University of Tennessee and The University
  *                         of Tennessee Research Foundation.  All rights
  *                         reserved.
  * Copyright (c) 2004-2008 High Performance Computing Center Stuttgart,
@@ -48,6 +48,8 @@ int MPI_Scatterv_init(const void *sendbuf, const int sendcounts[], const int dis
                       MPI_Datatype recvtype, int root, MPI_Comm comm, MPI_Info info, MPI_Request *request)
 {
     int i, size, err;
+    ompi_count_array_t sendcounts_desc;
+    ompi_disp_array_t displs_desc;
 
     SPC_RECORD(OMPI_SPC_SCATTERV_INIT, 1);
 
@@ -191,9 +193,21 @@ int MPI_Scatterv_init(const void *sendbuf, const int sendcounts[], const int dis
         }
     }
 
+    const void *updated_sendbuf;
+    void *updated_recvbuf;
+    if (OMPI_COMM_IS_INTRA(comm)) {
+        updated_sendbuf = (ompi_comm_rank(comm) != root) ? NULL : sendbuf;
+        updated_recvbuf = recvbuf;
+    } else {
+        updated_sendbuf = (MPI_ROOT != root ) ? NULL : sendbuf;
+        updated_recvbuf = ((MPI_ROOT == root) || (MPI_PROC_NULL == root)) ? NULL : recvbuf;
+    }
+
     /* Invoke the coll component to perform the back-end operation */
-    err = comm->c_coll->coll_scatterv_init(sendbuf, sendcounts, displs,
-                                           sendtype, recvbuf, recvcount, recvtype, root, comm,
+    OMPI_COUNT_ARRAY_INIT(&sendcounts_desc, sendcounts);
+    OMPI_DISP_ARRAY_INIT(&displs_desc, displs);
+    err = comm->c_coll->coll_scatterv_init(updated_sendbuf, sendcounts_desc, displs_desc,
+                                           sendtype, updated_recvbuf, recvcount, recvtype, root, comm,
                                            info, request, comm->c_coll->coll_scatterv_init_module);
     if (OPAL_LIKELY(OMPI_SUCCESS == err)) {
         if (OMPI_COMM_IS_INTRA(comm)) {

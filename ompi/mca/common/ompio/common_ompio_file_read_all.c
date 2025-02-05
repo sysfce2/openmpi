@@ -13,6 +13,9 @@
  * Copyright (c) 2017-2018 Research Organization for Information Science
  *                         and Technology (RIST). All rights reserved.
  * Copyright (c) 2023      Jeffrey M. Squyres.  All rights reserved.
+ * Copyright (c) 2024      Triad National Security, LLC. All rights
+ *                         reserved.
+ * Copyright (c) 2024      Advanced Micro Devices, Inc. All rights reserved.
  * $COPYRIGHT$
  *
  * Additional copyrights may follow
@@ -28,9 +31,12 @@
 #include "ompi/mca/fcoll/base/fcoll_base_coll_array.h"
 #include "ompi/mca/fcoll/base/base.h"
 #include "ompi/mca/common/ompio/common_ompio.h"
+#include "ompi/mca/common/ompio/common_ompio_request.h"
+#include "ompi/mca/common/ompio/common_ompio_buffer.h"
 #include "ompi/mca/io/io.h"
 #include "math.h"
 #include "ompi/mca/pml/pml.h"
+#include "opal/mca/accelerator/accelerator.h"
 #include <unistd.h>
 
 #define DEBUG_ON 0
@@ -54,7 +60,7 @@ static int read_heap_sort (mca_io_ompio_local_io_array *io_array,
 int
 mca_common_ompio_base_file_read_all (struct ompio_file_t *fh,
                                      void *buf,
-                                     int count,
+                                     size_t count,
                                      struct ompi_datatype_t *datatype,
                                      ompi_status_public_t *status)
 {
@@ -80,9 +86,11 @@ mca_common_ompio_base_file_read_all (struct ompio_file_t *fh,
     /* global iovec at the readers that contain the iovecs created from
        file_set_view */
     uint32_t total_fview_count = 0;
-    int local_count = 0;
-    int *fview_count = NULL, *disp_index=NULL, *temp_disp_index=NULL;
-    int current_index=0, temp_index=0;
+    size_t local_count = 0;
+    int temp_local_count = 0;
+    size_t *fview_count = NULL;
+    ptrdiff_t *disp_index=NULL, *temp_disp_index=NULL;
+    size_t current_index=0, temp_index=0;
     int **blocklen_per_process=NULL;
     MPI_Aint **displs_per_process=NULL;
     char *global_buf = NULL;
@@ -90,7 +98,7 @@ mca_common_ompio_base_file_read_all (struct ompio_file_t *fh,
 
     /* array that contains the sorted indices of the global_iov */
     int *sorted = NULL;
-    int *displs = NULL;
+    ptrdiff_t *displs = NULL;
     int base_num_io_procs;
     size_t max_data = 0;
     MPI_Aint *total_bytes_per_process = NULL;
@@ -101,6 +109,9 @@ mca_common_ompio_base_file_read_all (struct ompio_file_t *fh,
 
     int* blocklength_proc       = NULL;
     ptrdiff_t* displs_proc      = NULL;
+
+    int is_gpu, is_managed;
+    bool use_accelerator_buffer = false;
 
 #if OMPIO_FCOLL_WANT_TIME_BREAKDOWN
     double read_time = 0.0, start_read_time = 0.0, end_read_time = 0.0;
@@ -132,6 +143,12 @@ mca_common_ompio_base_file_read_all (struct ompio_file_t *fh,
     if ( OMPI_ERR_MAX == base_num_io_procs ) {
         ret = OMPI_ERROR;
         goto exit;
+    }
+
+    mca_common_ompio_check_gpu_buf (fh, buf, &is_gpu, &is_managed);
+    if (is_gpu && !is_managed && NULL != fh->f_fbtl->fbtl_ipreadv &&
+	fh->f_get_mca_parameter_value ("use_accelerator_buffers", strlen("use_accelerator_buffers"))) {
+	use_accelerator_buffer = true;
     }
 
     ret = mca_common_ompio_set_aggregator_props ((struct ompio_file_t *) fh,
@@ -187,7 +204,8 @@ mca_common_ompio_base_file_read_all (struct ompio_file_t *fh,
     ret = fh->f_generate_current_file_view ((struct ompio_file_t *) fh,
                                             max_data,
                                             &local_iov_array,
-                                            &local_count);
+                                            &temp_local_count);
+    local_count = temp_local_count;
 
     if (ret != OMPI_SUCCESS){
         goto exit;
@@ -197,7 +215,7 @@ mca_common_ompio_base_file_read_all (struct ompio_file_t *fh,
      *** 4. Allgather the File View information at all processes
      *************************************************************/
 
-    fview_count = (int *) malloc (fh->f_procs_per_group * sizeof (int));
+    fview_count = (size_t *)malloc (fh->f_procs_per_group * sizeof (size_t));
     if (NULL == fview_count) {
         opal_output (1, "OUT OF MEMORY\n");
         ret = OMPI_ERR_OUT_OF_RESOURCE;
@@ -207,11 +225,11 @@ mca_common_ompio_base_file_read_all (struct ompio_file_t *fh,
     start_rcomm_time = MPI_Wtime();
 #endif
     ret = ompi_fcoll_base_coll_allgather_array (&local_count,
-						1,
-						MPI_INT,
+						sizeof(size_t),
+						MPI_BYTE,
 						fview_count,
-						1,
-						MPI_INT,
+						sizeof(size_t),
+						MPI_BYTE,
 						0,
 						fh->f_procs_in_group,
 						fh->f_procs_per_group,
@@ -225,7 +243,7 @@ mca_common_ompio_base_file_read_all (struct ompio_file_t *fh,
     rcomm_time += end_rcomm_time - start_rcomm_time;
 #endif
 
-    displs = (int*)malloc (fh->f_procs_per_group*sizeof(int));
+    displs = (ptrdiff_t *)malloc (fh->f_procs_per_group*sizeof(ptrdiff_t));
     if (NULL == displs) {
         opal_output (1, "OUT OF MEMORY\n");
         ret = OMPI_ERR_OUT_OF_RESOURCE;
@@ -326,7 +344,7 @@ mca_common_ompio_base_file_read_all (struct ompio_file_t *fh,
     cycles = ceil((double)total_bytes/bytes_per_cycle);
 
     if ( my_aggregator == fh->f_rank) {
-      disp_index = (int *)malloc (fh->f_procs_per_group * sizeof (int));
+      disp_index = (ptrdiff_t *)malloc (fh->f_procs_per_group * sizeof (ptrdiff_t));
       if (NULL == disp_index) {
             opal_output (1, "OUT OF MEMORY\n");
             ret = OMPI_ERR_OUT_OF_RESOURCE;
@@ -359,11 +377,22 @@ mca_common_ompio_base_file_read_all (struct ompio_file_t *fh,
 	    goto exit;
 	}
 
-	global_buf = (char *) malloc (bytes_per_cycle);
-	if (NULL == global_buf){
-	    opal_output(1, "OUT OF MEMORY\n");
-	    ret = OMPI_ERR_OUT_OF_RESOURCE;
-	    goto exit;
+        if (use_accelerator_buffer) {
+            opal_output_verbose(10, ompi_fcoll_base_framework.framework_output,
+                                "Allocating GPU device buffer for aggregation\n");
+            ret = opal_accelerator.mem_alloc(MCA_ACCELERATOR_NO_DEVICE_ID, (void**)&global_buf,
+                                             bytes_per_cycle);
+            if (OPAL_SUCCESS != ret) {
+                opal_output(1, "Could not allocate accelerator memory");
+                ret = OMPI_ERR_OUT_OF_RESOURCE;
+                goto exit;
+            }
+        } else {global_buf = (char *) malloc (bytes_per_cycle);
+            if (NULL == global_buf){
+                opal_output(1, "OUT OF MEMORY\n");
+                ret = OMPI_ERR_OUT_OF_RESOURCE;
+                goto exit;
+            }
 	}
 
 	sendtype = (ompi_datatype_t **) malloc (fh->f_procs_per_group * sizeof(ompi_datatype_t *));
@@ -681,10 +710,26 @@ mca_common_ompio_base_file_read_all (struct ompio_file_t *fh,
 #endif
 
             if (fh->f_num_of_io_entries) {
-                if ( 0 >  fh->f_fbtl->fbtl_preadv (fh)) {
-                    opal_output (1, "READ FAILED\n");
-                    ret = OMPI_ERROR;
-                    goto exit;
+                if (use_accelerator_buffer) {
+		    mca_ompio_request_t *ompio_req = NULL;
+		    mca_common_ompio_request_alloc (&ompio_req, MCA_OMPIO_REQUEST_READ);
+
+                    ret = mca_common_ompio_file_iread_pregen(fh, (ompi_request_t *) ompio_req);
+                    if(0 > ret) {
+                        opal_output (1, "common_ompio_file_read_all: mca_common_ompio_iread_pregen failed\n");
+                        ompio_req->req_ompi.req_status.MPI_ERROR = ret;
+                        ompio_req->req_ompi.req_status._ucount = 0;
+                    }
+		    ret = ompi_request_wait ((ompi_request_t**)&ompio_req, MPI_STATUS_IGNORE);
+		    if (OMPI_SUCCESS != ret){
+			goto exit;
+		    }
+                } else {
+                    if ( 0 >  fh->f_fbtl->fbtl_preadv (fh)) {
+                        opal_output (1, "READ FAILED\n");
+                        ret = OMPI_ERROR;
+                        goto exit;
+                    }
                 }
             }
 
@@ -696,7 +741,7 @@ mca_common_ompio_base_file_read_all (struct ompio_file_t *fh,
              ******************** DONE READING ************************
              *********************************************************/
 
-            temp_disp_index = (int *)calloc (1, fh->f_procs_per_group * sizeof (int));
+            temp_disp_index = (ptrdiff_t *)calloc (1, fh->f_procs_per_group * sizeof (ptrdiff_t));
             if (NULL == temp_disp_index) {
                 opal_output (1, "OUT OF MEMORY\n");
                 ret = OMPI_ERR_OUT_OF_RESOURCE;
@@ -711,9 +756,9 @@ mca_common_ompio_base_file_read_all (struct ompio_file_t *fh,
                     temp_disp_index[temp_index] += 1;
                 }
                 else{
-                    printf("temp_disp_index[%d]: %d is greater than disp_index[%d]: %d\n",
-                           temp_index, temp_disp_index[temp_index],
-                           temp_index, disp_index[temp_index]);
+                    printf("temp_disp_index[%zu]: %ld is greater than disp_index[%zu]: %ld\n",
+                           temp_index, (long) temp_disp_index[temp_index],
+                           temp_index, (long) disp_index[temp_index]);
                 }
             }
             if (NULL != temp_disp_index){
@@ -876,7 +921,11 @@ mca_common_ompio_base_file_read_all (struct ompio_file_t *fh,
 
 exit:
     if (NULL != global_buf) {
-        free (global_buf);
+	if (use_accelerator_buffer) {
+	    opal_accelerator.mem_release(MCA_ACCELERATOR_NO_DEVICE_ID, global_buf);
+	} else {
+	    free (global_buf);
+	}
         global_buf = NULL;
     }
     if (NULL != sorted) {

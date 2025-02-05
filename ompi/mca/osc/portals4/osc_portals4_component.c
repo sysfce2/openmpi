@@ -38,10 +38,10 @@ static int component_open(void);
 static int component_register(void);
 static int component_init(bool enable_progress_threads, bool enable_mpi_threads);
 static int component_finalize(void);
-static int component_query(struct ompi_win_t *win, void **base, size_t size, int disp_unit,
+static int component_query(struct ompi_win_t *win, void **base, size_t size, ptrdiff_t disp_unit,
                            struct ompi_communicator_t *comm, struct opal_info_t *info,
                            int flavor);
-static int component_select(struct ompi_win_t *win, void **base, size_t size, int disp_unit,
+static int component_select(struct ompi_win_t *win, void **base, size_t size, ptrdiff_t disp_unit,
                             struct ompi_communicator_t *comm, struct opal_info_t *info,
                             int flavor, int *model);
 
@@ -49,7 +49,7 @@ static int component_select(struct ompi_win_t *win, void **base, size_t size, in
 ompi_osc_portals4_component_t mca_osc_portals4_component = {
     { /* ompi_osc_base_component_t */
         .osc_version = {
-            OMPI_OSC_BASE_VERSION_3_0_0,
+            OMPI_OSC_BASE_VERSION_4_0_0,
             .mca_component_name = "portals4",
             MCA_BASE_MAKE_VERSION(component, OMPI_MAJOR_VERSION, OMPI_MINOR_VERSION,
                                   OMPI_RELEASE_VERSION),
@@ -115,18 +115,18 @@ static bool
 check_config_value_bool(char *key, opal_info_t *info)
 {
     int ret, flag, param;
-    const bool *flag_value;
-    bool result;
+    bool result = false;
+    const bool *flag_value = &result;
+
     ret = opal_info_get_bool(info, key, &result, &flag);
-    if (OMPI_SUCCESS != ret || !flag) goto info_not_found;
-    return result;
+    if (OMPI_SUCCESS == ret && flag) {
+        return result;
+    }
 
- info_not_found:
     param = mca_base_var_find("ompi", "osc", "portals4", key);
-    if (0 > param) return false;
-
-    ret = mca_base_var_get_value(param, &flag_value, NULL, NULL);
-    if (OMPI_SUCCESS != ret) return false;
+    if (0 <= param) {
+        (void) mca_base_var_get_value(param, &flag_value, NULL, NULL);
+    }
 
     return flag_value[0];
 }
@@ -362,7 +362,7 @@ component_finalize(void)
 
 
 static int
-component_query(struct ompi_win_t *win, void **base, size_t size, int disp_unit,
+component_query(struct ompi_win_t *win, void **base, size_t size, ptrdiff_t disp_unit,
                 struct ompi_communicator_t *comm, struct opal_info_t *info,
                 int flavor)
 {
@@ -383,7 +383,7 @@ component_query(struct ompi_win_t *win, void **base, size_t size, int disp_unit,
 
 
 static int
-component_select(struct ompi_win_t *win, void **base, size_t size, int disp_unit,
+component_select(struct ompi_win_t *win, void **base, size_t size, ptrdiff_t disp_unit,
                  struct ompi_communicator_t *comm, struct opal_info_t *info,
                  int flavor, int *model)
 {
@@ -461,9 +461,9 @@ component_select(struct ompi_win_t *win, void **base, size_t size, int disp_unit
         module->disp_units = NULL;
     } else {
         module->disp_unit = -1;
-        module->disp_units = malloc(sizeof(int) * ompi_comm_size(module->comm));
-        ret = module->comm->c_coll->coll_allgather(&disp_unit, 1, MPI_INT,
-                                                  module->disp_units, 1, MPI_INT,
+        module->disp_units = malloc(sizeof(ptrdiff_t) * ompi_comm_size(module->comm));
+        ret = module->comm->c_coll->coll_allgather(&disp_unit, sizeof(ptrdiff_t), MPI_BYTE,
+                                                  module->disp_units, sizeof(ptrdiff_t), MPI_BYTE,
                                                   module->comm,
                                                   module->comm->c_coll->coll_allgather_module);
         if (OMPI_SUCCESS != ret) goto error;
@@ -615,10 +615,10 @@ component_select(struct ompi_win_t *win, void **base, size_t size, int disp_unit
 
  error:
     /* BWB: FIX ME: This is all wrong... */
-    if (0 != module->ct_h) PtlCTFree(module->ct_h);
-    if (0 != module->data_me_h) PtlMEUnlink(module->data_me_h);
-    if (0 != module->req_md_h) PtlMDRelease(module->req_md_h);
-    if (0 != module->md_h) PtlMDRelease(module->md_h);
+    if (!PtlHandleIsEqual(module->ct_h, PTL_INVALID_HANDLE)) PtlCTFree(module->ct_h);
+    if (!PtlHandleIsEqual(module->data_me_h, PTL_INVALID_HANDLE)) PtlMEUnlink(module->data_me_h);
+    if (!PtlHandleIsEqual(module->req_md_h, PTL_INVALID_HANDLE)) PtlMDRelease(module->req_md_h);
+    if (!PtlHandleIsEqual(module->md_h, PTL_INVALID_HANDLE)) PtlMDRelease(module->md_h);
     if (NULL != module->comm) ompi_comm_free(&module->comm);
     if (NULL != module) free(module);
 
@@ -655,11 +655,11 @@ ompi_osc_portals4_free(struct ompi_win_t *win)
     PtlMEUnlink(module->control_me_h);
     PtlMEUnlink(module->data_me_h);
     PtlMDRelease(module->md_h);
-    if (module->origin_iovec_md_h != PTL_INVALID_HANDLE) {
+    if (!PtlHandleIsEqual(module->origin_iovec_md_h,PTL_INVALID_HANDLE)) {
         PtlMDRelease(module->origin_iovec_md_h);
         free(module->origin_iovec_list);
     }
-    if (module->result_iovec_md_h != PTL_INVALID_HANDLE) {
+    if (!PtlHandleIsEqual(module->result_iovec_md_h,PTL_INVALID_HANDLE)) {
         PtlMDRelease(module->result_iovec_md_h);
         free(module->result_iovec_list);
     }

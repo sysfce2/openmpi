@@ -5,6 +5,7 @@
  *                         reserved.
  * Copyright (c) 2020      Research Organization for Information Science
  *                         and Technology (RIST).  All rights reserved.
+ * Copyright (c) 2024      Stony Brook University.  All rights reserved.
  * $COPYRIGHT$
  *
  * Additional copyrights may follow
@@ -12,6 +13,14 @@
  * $HEADER$
  */
 
+/* needed for strsep() */
+#define _DEFAULT_SOURCE
+#define _BSD_SOURCE
+
+/* needed for posix_memalign() and getopt() */
+#define _POSIX_C_SOURCE 200809L
+
+#include "ompi_config.h"
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -50,19 +59,9 @@ static int do_ops[12] = {
 static int verbose = 0;
 static int total_errors = 0;
 
-#define max(a, b)               \
-    ({                          \
-        __typeof__(a) _a = (a); \
-        __typeof__(b) _b = (b); \
-        _a > _b ? _a : _b;      \
-    })
+#define max(a, b) (a) > (b) ? (a) : (b)
 
-#define min(a, b)               \
-    ({                          \
-        __typeof__(a) _a = (a); \
-        __typeof__(b) _b = (b); \
-        _a < _b ? _a : _b;      \
-    })
+#define min(a, b) (a) < (b) ? (a) : (b)
 
 static void print_status(char *op, char *type, int type_size, int count, int max_shift,
                          double *duration, int repeats, int correct)
@@ -190,7 +189,7 @@ int main(int argc, char **argv)
     double *duration, tstart, tend;
     bool check = true;
     char type[5] = "uifd", *op = "sum", *mpi_type;
-    int lower = 1, upper = 1000000, skip_op_type;
+    int lower = 1, upper = 16*1024*1024, skip_op_type;
     MPI_Op mpi_op;
 
     while (-1 != (c = getopt(argc, argv, "l:u:r:t:o:i:s:n:1:2:vfh"))) {

@@ -15,9 +15,9 @@
  * Copyright (c) 2018      Research Organization for Information Science
  *                         and Technology (RIST). All rights reserved.
  * Copyright (c) 2018      Amazon.com, Inc. or its affiliates.  All Rights reserved.
- * Copyright (c) 2018      Triad National Security, LLC. All rights
+ * Copyright (c) 2018-2024 Triad National Security, LLC. All rights
  *                         reserved.
- * Copyright (c) 2019-2021 Google, LLC. All rights reserved.
+ * Copyright (c) 2019-2025 Google, LLC. All rights reserved.
  * Copyright (c) 2019      Intel, Inc.  All rights reserved.
  * Copyright (c) 2022      IBM Corporation.  All rights reserved.
  * $COPYRIGHT$
@@ -48,13 +48,13 @@ static int mca_btl_uct_component_register(void)
 {
     mca_btl_uct_module_t *module = &mca_btl_uct_module_template;
 
-    mca_btl_uct_component.memory_domains = "mlx5_0,mlx4_0";
+    mca_btl_uct_component.memory_domains = "mlx5_0,mlx4_0,rocep0s4";
     (void) mca_base_component_var_register(
         &mca_btl_uct_component.super.btl_version, "memory_domains",
         "Comma-delimited list of memory domains of the form "
         "to use for communication. Memory domains MUST provide transports that "
         "support put, get, and amos. Special values: all (all available), none."
-        " (default: mlx5_0,mlx4_0)",
+        " (default: mlx5_0,mlx4_0,rocep0s4)",
         MCA_BASE_VAR_TYPE_STRING, NULL, 0, MCA_BASE_VAR_FLAG_SETTABLE, OPAL_INFO_LVL_3,
         MCA_BASE_VAR_SCOPE_LOCAL, &mca_btl_uct_component.memory_domains);
 
@@ -102,8 +102,19 @@ static int mca_btl_uct_component_register(void)
         MCA_BASE_VAR_SCOPE_ALL, &mca_btl_uct_component.bind_threads_to_contexts);
 #endif
 
+    /* timeout between connection message attempts in µs */
+    mca_btl_uct_component.connection_retry_timeout = 2000;
+    (void) mca_base_component_var_register(
+        &mca_btl_uct_component.super.btl_version, "connection_retry_timeout",
+        "Timeout between attempts to send connection messages for connect-to-"
+        "endpoint connections. The timeout is measured in µs and is only"
+        "necessary when using unreliable transports for connections (ex: UD). "
+        "(default: 2000µs)",
+        MCA_BASE_VAR_TYPE_UNSIGNED_INT, NULL, 0, MCA_BASE_VAR_FLAG_SETTABLE, OPAL_INFO_LVL_4,
+        MCA_BASE_VAR_SCOPE_LOCAL, &mca_btl_uct_component.connection_retry_timeout);
+
     /* for now we want this component to lose to btl/ugni and btl/vader */
-    module->super.btl_exclusivity = MCA_BTL_EXCLUSIVITY_HIGH;
+    module->super.btl_exclusivity = MCA_BTL_EXCLUSIVITY_HIGH - 1;
 
     return mca_btl_base_param_register(&mca_btl_uct_component.super.btl_version, &module->super);
 }
@@ -348,6 +359,7 @@ static int mca_btl_uct_component_process_uct_md(uct_md_resource_desc_t *md_desc,
     bool found = false;
     unsigned num_tls;
     char *tmp;
+    ucs_status_t ucs_status;
 
     if (MCA_BTL_UCT_MAX_MODULES == mca_btl_uct_component.module_count) {
         BTL_VERBOSE(("created the maximum number of allowable modules"));
@@ -372,16 +384,40 @@ static int mca_btl_uct_component_process_uct_md(uct_md_resource_desc_t *md_desc,
     md = OBJ_NEW(mca_btl_uct_md_t);
 
 #if UCT_API >= UCT_VERSION(1, 7)
-    uct_md_config_read(component, NULL, NULL, &uct_config);
-    uct_md_open(component, md_desc->md_name, uct_config, &md->uct_md);
+    ucs_status = uct_md_config_read(component, NULL, NULL, &uct_config);
+    if (UCS_OK != ucs_status) {
+        BTL_VERBOSE(("uct_md_config_read failed %d (%s)", ucs_status, ucs_status_string(ucs_status)));
+        return OPAL_ERR_NOT_AVAILABLE;
+    }
+    ucs_status = uct_md_open(component, md_desc->md_name, uct_config, &md->uct_md);
+    if (UCS_OK != ucs_status) {
+        BTL_VERBOSE(("uct_md_open failed %d (%s)", ucs_status, ucs_status_string(ucs_status)));
+        return OPAL_ERR_NOT_AVAILABLE;
+    }
 #else
-    uct_md_config_read(md_desc->md_name, NULL, NULL, &uct_config);
-    uct_md_open(md_desc->md_name, uct_config, &md->uct_md);
+    ucs_status = uct_md_config_read(md_desc->md_name, NULL, NULL, &uct_config);
+    if (UCS_OK != ucs_status) {
+        BTL_VERBOSE(("uct_md_config_read failed %d (%s)", ucs_status, ucs_status_string(ucs_status)));
+        return OPAL_ERR_NOT_AVAILABLE;
+    }
+    ucs_status = uct_md_open(md_desc->md_name, uct_config, &md->uct_md);
+    if (UCS_OK != ucs_status) {
+        BTL_VERBOSE(("uct_md_open failed %d (%s)", ucs_status, ucs_status_string(ucs_status)));
+        return OPAL_ERR_NOT_AVAILABLE;
+    }
 #endif
     uct_config_release(uct_config);
 
-    uct_md_query(md->uct_md, &md_attr);
-    uct_md_query_tl_resources(md->uct_md, &tl_desc, &num_tls);
+    ucs_status = uct_md_query(md->uct_md, &md_attr);
+    if (UCS_OK != ucs_status) {
+        BTL_VERBOSE(("uct_config_release failed %d (%s)", ucs_status, ucs_status_string(ucs_status)));
+        return OPAL_ERR_NOT_AVAILABLE;
+    }
+    ucs_status = uct_md_query_tl_resources(md->uct_md, &tl_desc, &num_tls);
+    if (UCS_OK != ucs_status) {
+        BTL_VERBOSE(("uct_config_release failed %d (%s)", ucs_status, ucs_status_string(ucs_status)));
+        return OPAL_ERR_NOT_AVAILABLE;
+    }
 
     module = mca_btl_uct_alloc_module(md_desc->md_name, md, md_attr.rkey_packed_size);
     if (NULL == module) {

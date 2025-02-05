@@ -15,6 +15,8 @@
  * Copyright (c) 2017      IBM Corporation. All rights reserved.
  * Copyright (c) 2018      Cisco Systems, Inc.  All rights reserved
  * Copyright (c) 2023      Jeffrey M. Squyres.  All rights reserved.
+ * Copyright (c) 2024      Triad National Security, LLC. All rights
+ *                         reserved.
  * $COPYRIGHT$
  *
  * Additional copyrights may follow
@@ -46,7 +48,8 @@ typedef struct mca_io_ompio_local_io_array{
 }mca_io_ompio_local_io_array;
 
 typedef struct mca_io_ompio_aggregator_data {
-    int *disp_index, *sorted, *fview_count, n;
+    int *disp_index, *sorted, n;
+    size_t *fview_count;
     int *max_disp_index;
     int **blocklen_per_process;
     MPI_Aint **displs_per_process, total_bytes, bytes_per_cycle, total_bytes_written;
@@ -115,7 +118,7 @@ int mca_fcoll_dynamic_gen2_split_iov_array ( ompio_file_t *fh, mca_common_ompio_
 
 int mca_fcoll_dynamic_gen2_file_write_all (struct ompio_file_t *fh,
                                       const void *buf,
-                                      int count,
+                                      size_t count,
                                       struct ompi_datatype_t *datatype,
                                       ompi_status_public_t *status)
 {
@@ -131,7 +134,7 @@ int mca_fcoll_dynamic_gen2_file_write_all (struct ompio_file_t *fh,
     ompi_request_t **curr_reqs=NULL,**prev_reqs=NULL;
     mca_io_ompio_aggregator_data **aggr_data=NULL;
     
-    int *displs = NULL;
+    ptrdiff_t *displs = NULL;
     int dynamic_gen2_num_io_procs;
     size_t max_data = 0;
     MPI_Aint *total_bytes_per_process = NULL;
@@ -144,8 +147,10 @@ int mca_fcoll_dynamic_gen2_file_write_all (struct ompio_file_t *fh,
 
     int *aggregators=NULL;
     int *result_counts=NULL;
-    
-    
+
+    ompi_count_array_t fview_count_desc;
+    ompi_disp_array_t displs_desc;
+
 #if OMPIO_FCOLL_WANT_TIME_BREAKDOWN
     double write_time = 0.0, start_write_time = 0.0, end_write_time = 0.0;
     double comm_time = 0.0, start_comm_time = 0.0, end_comm_time = 0.0;
@@ -357,7 +362,7 @@ int mca_fcoll_dynamic_gen2_file_write_all (struct ompio_file_t *fh,
     for ( i=0; i< dynamic_gen2_num_io_procs; i++ ) {
         aggr_data[i]->total_bytes = broken_total_lengths[i];
         aggr_data[i]->decoded_iov = broken_decoded_iovs[i];
-        aggr_data[i]->fview_count = (int *) malloc (fh->f_procs_per_group * sizeof (int));
+        aggr_data[i]->fview_count = (size_t *)malloc (fh->f_procs_per_group * sizeof (size_t));
         if (NULL == aggr_data[i]->fview_count) {
             opal_output (1, "OUT OF MEMORY\n");
             ret = OMPI_ERR_OUT_OF_RESOURCE;
@@ -366,7 +371,7 @@ int mca_fcoll_dynamic_gen2_file_write_all (struct ompio_file_t *fh,
         for ( j=0; j <fh->f_procs_per_group; j++ ) {
             aggr_data[i]->fview_count[j] = result_counts[dynamic_gen2_num_io_procs*j+i];
         }
-        displs = (int*) malloc (fh->f_procs_per_group * sizeof (int));
+        displs = (ptrdiff_t *)malloc (fh->f_procs_per_group * sizeof (ptrdiff_t));
         if (NULL == displs) {
             opal_output (1, "OUT OF MEMORY\n");
             ret = OMPI_ERR_OUT_OF_RESOURCE;
@@ -374,7 +379,7 @@ int mca_fcoll_dynamic_gen2_file_write_all (struct ompio_file_t *fh,
         }
         
         displs[0] = 0;
-        total_fview_count = aggr_data[i]->fview_count[0];
+        total_fview_count = (int) aggr_data[i]->fview_count[0];
         for (j=1 ; j<fh->f_procs_per_group ; j++) {
             total_fview_count += aggr_data[i]->fview_count[j];
             displs[j] = displs[j-1] + aggr_data[i]->fview_count[j-1];
@@ -408,12 +413,14 @@ int mca_fcoll_dynamic_gen2_file_write_all (struct ompio_file_t *fh,
         start_comm_time = MPI_Wtime();
 #endif
         if ( 1 == mca_fcoll_dynamic_gen2_num_groups ) {
+            OMPI_COUNT_ARRAY_INIT(&fview_count_desc, aggr_data[i]->fview_count);
+            OMPI_DISP_ARRAY_INIT(&displs_desc, displs);
             ret = fh->f_comm->c_coll->coll_allgatherv (broken_iov_arrays[i],
                                                       broken_counts[i],
                                                       fh->f_iov_type,
                                                       aggr_data[i]->global_iov_array,
-                                                      aggr_data[i]->fview_count,
-                                                      displs,
+                                                      fview_count_desc,
+                                                      displs_desc,
                                                       fh->f_iov_type,
                                                       fh->f_comm,
                                                       fh->f_comm->c_coll->coll_allgatherv_module );

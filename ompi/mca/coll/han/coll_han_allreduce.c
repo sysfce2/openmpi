@@ -6,6 +6,7 @@
  *
  * Copyright (c) 2020      Cisco Systems, Inc.  All rights reserved.
  * Copyright (c) 2022      IBM Corporation. All rights reserved
+ * Copyright (c) 2024      NVIDIA Corporation.  All rights reserved.
  * $COPYRIGHT$
  *
  * Additional copyrights may follow
@@ -90,7 +91,7 @@ mca_coll_han_set_allreduce_args(mca_coll_han_allreduce_args_t * args,
 int
 mca_coll_han_allreduce_intra(const void *sbuf,
                              void *rbuf,
-                             int count,
+                             size_t count,
                              struct ompi_datatype_t *dtype,
                              struct ompi_op_t *op,
                              struct ompi_communicator_t *comm, mca_coll_base_module_t * module)
@@ -109,7 +110,7 @@ mca_coll_han_allreduce_intra(const void *sbuf,
         OPAL_OUTPUT_VERBOSE((30, mca_coll_han_component.han_output,
                              "han cannot handle allreduce with this communicator. Drop HAN support in this communicator and fall back on another component\n"));
         /* HAN cannot work with this communicator so fallback on all collectives */
-        HAN_LOAD_FALLBACK_COLLECTIVES(han_module, comm);
+        HAN_LOAD_FALLBACK_COLLECTIVES(comm, han_module);
         return han_module->previous_allreduce(sbuf, rbuf, count, dtype, op,
                                               comm, han_module->previous_allreduce_module);
     }
@@ -131,8 +132,8 @@ mca_coll_han_allreduce_intra(const void *sbuf,
                                 seg_count);
 
     /* Determine number of elements sent per task. */
-    OPAL_OUTPUT_VERBOSE((10, mca_coll_han_component.han_output,
-                         "In HAN Allreduce seg_size %d seg_count %d count %d\n",
+    OPAL_OUTPUT_VERBOSE((30, mca_coll_han_component.han_output,
+                         "In HAN Allreduce seg_size %d seg_count %d count %zu\n",
                          mca_coll_han_component.han_allreduce_segsize, seg_count, count));
     int num_segments = (count + seg_count - 1) / seg_count;
 
@@ -464,7 +465,7 @@ int mca_coll_han_allreduce_t3_task(void *task_args)
 int
 mca_coll_han_allreduce_intra_simple(const void *sbuf,
                                     void *rbuf,
-                                    int count,
+                                    size_t count,
                                     struct ompi_datatype_t *dtype,
                                     struct ompi_op_t *op,
                                     struct ompi_communicator_t *comm,
@@ -495,7 +496,7 @@ mca_coll_han_allreduce_intra_simple(const void *sbuf,
         OPAL_OUTPUT_VERBOSE((30, mca_coll_han_component.han_output,
                              "han cannot handle allreduce with this communicator. Drop HAN support in this communicator and fall back on another component\n"));
         /* HAN cannot work with this communicator so fallback on all collectives */
-        HAN_LOAD_FALLBACK_COLLECTIVES(han_module, comm);
+        HAN_LOAD_FALLBACK_COLLECTIVES(comm, han_module);
         return han_module->previous_allreduce(sbuf, rbuf, count, dtype, op,
                                               comm, han_module->previous_allreduce_module);
     }
@@ -611,7 +612,7 @@ mca_coll_han_allreduce_reproducible_decision(struct ompi_communicator_t *comm,
 int
 mca_coll_han_allreduce_reproducible(const void *sbuf,
                                     void *rbuf,
-                                     int count,
+                                     size_t count,
                                      struct ompi_datatype_t *dtype,
                                      struct ompi_op_t *op,
                                      struct ompi_communicator_t *comm,

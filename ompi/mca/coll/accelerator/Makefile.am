@@ -2,7 +2,7 @@
 # Copyright (c) 2014      The University of Tennessee and The University
 #                         of Tennessee Research Foundation.  All rights
 #                         reserved.
-# Copyright (c) 2014      NVIDIA Corporation.  All rights reserved.
+# Copyright (c) 2014-2024 NVIDIA Corporation.  All rights reserved.
 # Copyright (c) 2017      IBM Corporation.  All rights reserved.
 # $COPYRIGHT$
 #
@@ -10,10 +10,11 @@
 #
 # $HEADER$
 #
-dist_ompidata_DATA = help-mpi-coll-accelerator.txt
 
-sources = coll_accelerator_module.c coll_accelerator_reduce.c coll_accelerator_allreduce.c \
-          coll_accelerator_reduce_scatter_block.c coll_accelerator_component.c \
+sources = coll_accelerator_reduce.c coll_accelerator_allreduce.c \
+          coll_accelerator_reduce_scatter_block.c coll_accelerator_reduce_scatter.c       \
+	  coll_accelerator_allgather.c coll_accelerator_alltoall.c coll_accelerator_bcast.c \
+	  coll_accelerator_component.c coll_accelerator_module.c \
           coll_accelerator_scan.c coll_accelerator_exscan.c coll_accelerator.h
 
 # Make the output library in this directory, and name it either

@@ -3,6 +3,7 @@
  *                         of Tennessee Research Foundation.  All rights
  *                         reserved.
  * Copyright (c) 2022      IBM Corporation. All rights reserved
+ * Copyright (c) 2024      NVIDIA CORPORATION. All rights reserved.
  * $COPYRIGHT$
  *
  * Additional copyrights may follow
@@ -34,8 +35,9 @@ int ompi_coll_adapt_ibcast_register(void)
 
     mca_coll_adapt_component.adapt_ibcast_algorithm = 1;
     mca_base_component_var_register(c, "bcast_algorithm",
-                                    "Algorithm of broadcast, 0: tuned, 1: binomial, 2: in_order_binomial, 3: binary, 4: pipeline, 5: chain, 6: linear", MCA_BASE_VAR_TYPE_INT, NULL, 0, 0,
-                                    OPAL_INFO_LVL_5, MCA_BASE_VAR_SCOPE_READONLY,
+                                    "Algorithm of broadcast, 0: tuned, 1: binomial, 2: in_order_binomial, 3: binary, 4: pipeline, 5: chain, 6: linear",
+                                    MCA_BASE_VAR_TYPE_INT, NULL, 0, MCA_BASE_VAR_FLAG_SETTABLE,
+                                    OPAL_INFO_LVL_5, MCA_BASE_VAR_SCOPE_ALL,
                                     &mca_coll_adapt_component.adapt_ibcast_algorithm);
     if( (mca_coll_adapt_component.adapt_ibcast_algorithm < 0) ||
         (mca_coll_adapt_component.adapt_ibcast_algorithm >= OMPI_COLL_ADAPT_ALGORITHM_COUNT) ) {
@@ -45,33 +47,33 @@ int ompi_coll_adapt_ibcast_register(void)
     mca_coll_adapt_component.adapt_ibcast_segment_size = 0;
     mca_base_component_var_register(c, "bcast_segment_size",
                                     "Segment size in bytes used by default for bcast algorithms. Only has meaning if algorithm is forced and supports segmenting. 0 bytes means no segmentation.",
-                                    MCA_BASE_VAR_TYPE_INT, NULL, 0, 0,
+                                    MCA_BASE_VAR_TYPE_INT, NULL, 0, MCA_BASE_VAR_FLAG_SETTABLE,
                                     OPAL_INFO_LVL_5,
-                                    MCA_BASE_VAR_SCOPE_READONLY,
+                                    MCA_BASE_VAR_SCOPE_ALL,
                                     &mca_coll_adapt_component.adapt_ibcast_segment_size);
 
     mca_coll_adapt_component.adapt_ibcast_max_send_requests = 2;
     mca_base_component_var_register(c, "bcast_max_send_requests",
                                     "Maximum number of send requests",
-                                    MCA_BASE_VAR_TYPE_INT, NULL, 0, 0,
+                                    MCA_BASE_VAR_TYPE_INT, NULL, 0, MCA_BASE_VAR_FLAG_SETTABLE,
                                     OPAL_INFO_LVL_5,
-                                    MCA_BASE_VAR_SCOPE_READONLY,
+                                    MCA_BASE_VAR_SCOPE_ALL,
                                     &mca_coll_adapt_component.adapt_ibcast_max_send_requests);
 
     mca_coll_adapt_component.adapt_ibcast_max_recv_requests = 3;
     mca_base_component_var_register(c, "bcast_max_recv_requests",
                                     "Maximum number of receive requests",
-                                    MCA_BASE_VAR_TYPE_INT, NULL, 0, 0,
+                                    MCA_BASE_VAR_TYPE_INT, NULL, 0, MCA_BASE_VAR_FLAG_SETTABLE,
                                     OPAL_INFO_LVL_5,
-                                    MCA_BASE_VAR_SCOPE_READONLY,
+                                    MCA_BASE_VAR_SCOPE_ALL,
                                     &mca_coll_adapt_component.adapt_ibcast_max_recv_requests);
 
     mca_coll_adapt_component.adapt_ibcast_synchronous_send = true;
     (void) mca_base_component_var_register(c, "bcast_synchronous_send",
                                            "Whether to use synchronous send operations during setup of bcast operations",
-                                           MCA_BASE_VAR_TYPE_BOOL, NULL, 0, 0,
+                                           MCA_BASE_VAR_TYPE_BOOL, NULL, 0, MCA_BASE_VAR_FLAG_SETTABLE,
                                            OPAL_INFO_LVL_9,
-                                           MCA_BASE_VAR_SCOPE_READONLY,
+                                           MCA_BASE_VAR_SCOPE_ALL,
                                            &mca_coll_adapt_component.adapt_ibcast_synchronous_send);
 
     mca_coll_adapt_component.adapt_ibcast_context_free_list = NULL;
@@ -319,7 +321,7 @@ static int recv_cb(ompi_request_t * req)
     return 1;
 }
 
-int ompi_coll_adapt_ibcast(void *buff, int count, struct ompi_datatype_t *datatype, int root,
+int ompi_coll_adapt_ibcast(void *buff, size_t count, struct ompi_datatype_t *datatype, int root,
                           struct ompi_communicator_t *comm, ompi_request_t ** request,
                           mca_coll_base_module_t * module)
 {
@@ -341,7 +343,7 @@ int ompi_coll_adapt_ibcast(void *buff, int count, struct ompi_datatype_t *dataty
 }
 
 
-int ompi_coll_adapt_ibcast_generic(void *buff, int count, struct ompi_datatype_t *datatype, int root,
+int ompi_coll_adapt_ibcast_generic(void *buff, size_t count, struct ompi_datatype_t *datatype, int root,
                                    struct ompi_communicator_t *comm, ompi_request_t ** request,
                                    mca_coll_base_module_t * module, ompi_coll_tree_t * tree,
                                    size_t seg_size)
@@ -351,7 +353,7 @@ int ompi_coll_adapt_ibcast_generic(void *buff, int count, struct ompi_datatype_t
     int min;
 
     /* Number of datatype in a segment */
-    int seg_count = count;
+    size_t seg_count = count;
     /* Size of a datatype */
     size_t type_size;
     /* Real size of a segment */
@@ -446,7 +448,7 @@ int ompi_coll_adapt_ibcast_generic(void *buff, int count, struct ompi_datatype_t
                          "[%d]: Ibcast, root %d, tag %d\n", rank, root,
                          con->ibcast_tag));
     OPAL_OUTPUT_VERBOSE((30, mca_coll_adapt_component.adapt_output,
-                         "[%d]: con->mutex = %p, num_children = %d, num_segs = %d, real_seg_size = %d, seg_count = %d, tree_adreess = %p\n",
+                         "[%d]: con->mutex = %p, num_children = %d, num_segs = %d, real_seg_size = %d, seg_count = %zu, tree_adreess = %p\n",
                          rank, (void *) con->mutex, tree->tree_nextsize, num_segs,
                          (int) real_seg_size, seg_count, (void *) con->tree));
 
